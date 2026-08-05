@@ -1,0 +1,753 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "NEIS 학교 및 급식 정보 API",
+    "description": "나이스 교육정보 개방 포털에서 제공하는 학교기본정보 및 급식식단정보 API 명세입니다.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://open.neis.go.kr/hub",
+      "description": "NEIS Open API"
+    }
+  ],
+  "paths": {
+    "/schoolInfo": {
+      "get": {
+        "operationId": "getSchoolInfo",
+        "summary": "학교기본정보 조회",
+        "description": "학교기본정보를 조회합니다.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Key"
+          },
+          {
+            "$ref": "#/components/parameters/Type"
+          },
+          {
+            "$ref": "#/components/parameters/PIndex"
+          },
+          {
+            "$ref": "#/components/parameters/PSize"
+          },
+          {
+            "$ref": "#/components/parameters/AtptOfcdcScCode"
+          },
+          {
+            "$ref": "#/components/parameters/SdSchulCode"
+          },
+          {
+            "$ref": "#/components/parameters/SchulNm"
+          },
+          {
+            "$ref": "#/components/parameters/SchulKndScNm"
+          },
+          {
+            "$ref": "#/components/parameters/LctnScNm"
+          },
+          {
+            "$ref": "#/components/parameters/FondScNm"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "정상 처리되었습니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchoolInfoResponse"
+                }
+              },
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/NeisXmlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequiredValueError"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidTypeError"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidKeyError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ServiceNotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/RequestLimitError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TrafficLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseError"
+          }
+        }
+      }
+    },
+    "/mealServiceDietInfo": {
+      "get": {
+        "operationId": "getMealServiceDietInfo",
+        "summary": "급식식단정보 조회",
+        "description": "학교의 급식식단정보를 조회합니다.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Key"
+          },
+          {
+            "$ref": "#/components/parameters/Type"
+          },
+          {
+            "$ref": "#/components/parameters/PIndex"
+          },
+          {
+            "$ref": "#/components/parameters/PSize"
+          },
+          {
+            "$ref": "#/components/parameters/AtptOfcdcScCodeRequired"
+          },
+          {
+            "$ref": "#/components/parameters/SdSchulCodeRequired"
+          },
+          {
+            "$ref": "#/components/parameters/MmealScCode"
+          },
+          {
+            "$ref": "#/components/parameters/MlsvYmd"
+          },
+          {
+            "$ref": "#/components/parameters/MlsvFromYmd"
+          },
+          {
+            "$ref": "#/components/parameters/MlsvToYmd"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "정상 처리되었습니다.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealServiceDietInfoResponse"
+                }
+              },
+              "application/xml": {
+                "schema": {
+                  "$ref": "#/components/schemas/NeisXmlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/RequiredValueError"
+          },
+          "422": {
+            "$ref": "#/components/responses/InvalidTypeError"
+          },
+          "401": {
+            "$ref": "#/components/responses/InvalidKeyError"
+          },
+          "404": {
+            "$ref": "#/components/responses/ServiceNotFoundError"
+          },
+          "413": {
+            "$ref": "#/components/responses/RequestLimitError"
+          },
+          "429": {
+            "$ref": "#/components/responses/TrafficLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          },
+          "503": {
+            "$ref": "#/components/responses/DatabaseError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Key": {
+        "name": "Key",
+        "in": "query",
+        "required": true,
+        "description": "인증키. 기본값은 sample key입니다.",
+        "schema": {
+          "type": "string",
+          "default": "sample key"
+        }
+      },
+      "Type": {
+        "name": "Type",
+        "in": "query",
+        "required": true,
+        "description": "호출 문서 형식입니다.",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "xml",
+            "json"
+          ],
+          "default": "xml"
+        }
+      },
+      "PIndex": {
+        "name": "pIndex",
+        "in": "query",
+        "required": true,
+        "description": "페이지 위치. sample key 사용 시 1로 고정됩니다.",
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      "PSize": {
+        "name": "pSize",
+        "in": "query",
+        "required": true,
+        "description": "페이지당 요청 숫자. sample key 사용 시 5로 고정됩니다.",
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "AtptOfcdcScCode": {
+        "name": "ATPT_OFCDC_SC_CODE",
+        "in": "query",
+        "required": false,
+        "description": "시도교육청코드. 학교를 관리하는 시도교육청 기관코드입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "AtptOfcdcScCodeRequired": {
+        "name": "ATPT_OFCDC_SC_CODE",
+        "in": "query",
+        "required": true,
+        "description": "시도교육청코드. 시도교육청구분코드입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SdSchulCode": {
+        "name": "SD_SCHUL_CODE",
+        "in": "query",
+        "required": false,
+        "description": "행정표준코드입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SdSchulCodeRequired": {
+        "name": "SD_SCHUL_CODE",
+        "in": "query",
+        "required": true,
+        "description": "행정표준코드입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SchulNm": {
+        "name": "SCHUL_NM",
+        "in": "query",
+        "required": false,
+        "description": "학교의 명칭입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "SchulKndScNm": {
+        "name": "SCHUL_KND_SC_NM",
+        "in": "query",
+        "required": false,
+        "description": "학교의 종류입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "LctnScNm": {
+        "name": "LCTN_SC_NM",
+        "in": "query",
+        "required": false,
+        "description": "학교가 소속되어 있는 시도명입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "FondScNm": {
+        "name": "FOND_SC_NM",
+        "in": "query",
+        "required": false,
+        "description": "학교의 설립주체에 따른 구분입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "MmealScCode": {
+        "name": "MMEAL_SC_CODE",
+        "in": "query",
+        "required": false,
+        "description": "식사구분코드입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "MlsvYmd": {
+        "name": "MLSV_YMD",
+        "in": "query",
+        "required": false,
+        "description": "급식일자입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "MlsvFromYmd": {
+        "name": "MLSV_FROM_YMD",
+        "in": "query",
+        "required": false,
+        "description": "급식시작일자입니다.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "MlsvToYmd": {
+        "name": "MLSV_TO_YMD",
+        "in": "query",
+        "required": false,
+        "description": "급식종료일자입니다.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "SchoolInfo": {
+        "type": "object",
+        "description": "학교기본정보 출력값입니다.",
+        "properties": {
+          "ATPT_OFCDC_SC_CODE": {
+            "type": "string",
+            "description": "시도교육청코드"
+          },
+          "ATPT_OFCDC_SC_NM": {
+            "type": "string",
+            "description": "시도교육청명"
+          },
+          "SD_SCHUL_CODE": {
+            "type": "string",
+            "description": "행정표준코드"
+          },
+          "SCHUL_NM": {
+            "type": "string",
+            "description": "학교명"
+          },
+          "ENG_SCHUL_NM": {
+            "type": "string",
+            "description": "영문학교명"
+          },
+          "SCHUL_KND_SC_NM": {
+            "type": "string",
+            "description": "학교종류명"
+          },
+          "LCTN_SC_NM": {
+            "type": "string",
+            "description": "시도명"
+          },
+          "JU_ORG_NM": {
+            "type": "string",
+            "description": "관할조직명"
+          },
+          "FOND_SC_NM": {
+            "type": "string",
+            "description": "설립명"
+          },
+          "ORG_RDNZC": {
+            "type": "string",
+            "description": "도로명우편번호"
+          },
+          "ORG_RDNMA": {
+            "type": "string",
+            "description": "도로명주소"
+          },
+          "ORG_RDNDA": {
+            "type": "string",
+            "description": "도로명상세주소"
+          },
+          "ORG_TELNO": {
+            "type": "string",
+            "description": "전화번호"
+          },
+          "HMPG_ADRES": {
+            "type": "string",
+            "description": "홈페이지주소"
+          },
+          "COEDU_SC_NM": {
+            "type": "string",
+            "description": "남녀공학구분명"
+          },
+          "ORG_FAXNO": {
+            "type": "string",
+            "description": "팩스번호"
+          },
+          "HS_SC_NM": {
+            "type": "string",
+            "description": "고등학교구분명"
+          },
+          "INDST_SPECL_CCCCL_EXST_YN": {
+            "type": "string",
+            "description": "산업체특별학급존재여부"
+          },
+          "HS_GNRL_BUSNS_SC_NM": {
+            "type": "string",
+            "description": "고등학교일반전문구분명"
+          },
+          "SPCLY_PURPS_HS_ORD_NM": {
+            "type": "string",
+            "description": "특수목적고등학교계열명"
+          },
+          "ENE_BFE_SEHF_SC_NM": {
+            "type": "string",
+            "description": "입시전후기구분명"
+          },
+          "DGHT_SC_NM": {
+            "type": "string",
+            "description": "주야구분명"
+          },
+          "FOND_YMD": {
+            "type": "string",
+            "description": "설립일자"
+          },
+          "FOAS_MEMRD": {
+            "type": "string",
+            "description": "개교기념일"
+          },
+          "LOAD_DTM": {
+            "type": "string",
+            "description": "수정일자"
+          }
+        }
+      },
+      "MealServiceDietInfo": {
+        "type": "object",
+        "description": "급식식단정보 출력값입니다.",
+        "properties": {
+          "ATPT_OFCDC_SC_CODE": {
+            "type": "string",
+            "description": "시도교육청코드"
+          },
+          "ATPT_OFCDC_SC_NM": {
+            "type": "string",
+            "description": "시도교육청명"
+          },
+          "SD_SCHUL_CODE": {
+            "type": "string",
+            "description": "행정표준코드"
+          },
+          "SCHUL_NM": {
+            "type": "string",
+            "description": "학교명"
+          },
+          "MMEAL_SC_CODE": {
+            "type": "string",
+            "description": "식사코드"
+          },
+          "MMEAL_SC_NM": {
+            "type": "string",
+            "description": "식사명"
+          },
+          "MLSV_YMD": {
+            "type": "string",
+            "description": "급식일자"
+          },
+          "MLSV_FGR": {
+            "type": "string",
+            "description": "급식인원수"
+          },
+          "DDISH_NM": {
+            "type": "string",
+            "description": "요리명"
+          },
+          "ORPLC_INFO": {
+            "type": "string",
+            "description": "원산지정보"
+          },
+          "CAL_INFO": {
+            "type": "string",
+            "description": "칼로리정보"
+          },
+          "NTR_INFO": {
+            "type": "string",
+            "description": "영양정보"
+          },
+          "MLSV_FROM_YMD": {
+            "type": "string",
+            "description": "급식시작일자"
+          },
+          "MLSV_TO_YMD": {
+            "type": "string",
+            "description": "급식종료일자"
+          },
+          "LOAD_DTM": {
+            "type": "string",
+            "description": "수정일자"
+          }
+        }
+      },
+      "NeisHead": {
+        "type": "object",
+        "properties": {
+          "list_total_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "RESULT": {
+            "$ref": "#/components/schemas/NeisResult"
+          }
+        }
+      },
+      "NeisResult": {
+        "type": "object",
+        "properties": {
+          "CODE": {
+            "type": "string"
+          },
+          "MESSAGE": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "CODE",
+          "MESSAGE"
+        ]
+      },
+      "SchoolInfoResponse": {
+        "type": "object",
+        "properties": {
+          "schoolInfo": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NeisHead"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "row": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SchoolInfo"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "schoolInfo"
+        ]
+      },
+      "MealServiceDietInfoResponse": {
+        "type": "object",
+        "properties": {
+          "mealServiceDietInfo": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NeisHead"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "row": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MealServiceDietInfo"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "mealServiceDietInfo"
+        ]
+      },
+      "NeisXmlResponse": {
+        "type": "object",
+        "description": "Type이 xml인 경우의 XML 응답입니다.",
+        "xml": {
+          "name": "response"
+        },
+        "additionalProperties": true
+      },
+      "NeisError": {
+        "type": "object",
+        "properties": {
+          "CODE": {
+            "type": "string"
+          },
+          "MESSAGE": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "CODE",
+          "MESSAGE"
+        ]
+      }
+    },
+    "responses": {
+      "RequiredValueError": {
+        "description": "필수 값이 누락되어 있습니다. 요청인자를 참고 하십시오. (ERROR 300)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            },
+            "example": {
+              "CODE": "ERROR-300",
+              "MESSAGE": "필수 값이 누락되어 있습니다. 요청인자를 참고 하십시오."
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "InvalidKeyError": {
+        "description": "인증키가 유효하지 않습니다. (ERROR 290)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            },
+            "example": {
+              "CODE": "ERROR-290",
+              "MESSAGE": "인증키가 유효하지 않습니다. 인증키가 없는 경우, 홈페이지에서 인증키를 신청하십시오."
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "InvalidTypeError": {
+        "description": "요청위치 값의 타입이 유효하지 않습니다. 요청위치 값은 정수를 입력하세요. (ERROR 333)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            },
+            "example": {
+              "CODE": "ERROR-333",
+              "MESSAGE": "요청위치 값의 타입이 유효하지 않습니다.요청위치 값은 정수를 입력하세요."
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "ServiceNotFoundError": {
+        "description": "해당하는 서비스를 찾을 수 없습니다. 요청인자 중 SERVICE를 확인하십시오. (ERROR 310)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "RequestLimitError": {
+        "description": "데이터요청은 한번에 최대 1,000건을 넘을 수 없습니다. (ERROR 336)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "TrafficLimitError": {
+        "description": "일별 트래픽 제한을 넘은 호출입니다. 오늘은 더이상 호출할 수 없습니다. (ERROR 337)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "서버 오류입니다. 지속적으로 발생시 홈페이지로 문의(Q&A) 바랍니다. (ERROR 500)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      },
+      "DatabaseError": {
+        "description": "데이터베이스 연결 오류 또는 SQL 문장 오류입니다. (ERROR 600, 601)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisError"
+            }
+          },
+          "application/xml": {
+            "schema": {
+              "$ref": "#/components/schemas/NeisXmlResponse"
+            }
+          }
+        }
+      }
+    }
+  }
+}
