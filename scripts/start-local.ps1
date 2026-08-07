@@ -1,0 +1,27 @@
+$ErrorActionPreference = "Stop"
+
+$root = Split-Path -Parent $PSScriptRoot
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    throw "uv가 필요합니다. https://docs.astral.sh/uv/getting-started/installation/ 를 참고하세요."
+}
+if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+    throw "Node.js와 npm이 필요합니다."
+}
+
+$backend = Start-Process `
+    -FilePath "uv" `
+    -ArgumentList "run --project src/backend python -m uvicorn app.main:app --app-dir src/backend --host 127.0.0.1 --port 8000" `
+    -WorkingDirectory $root `
+    -PassThru
+
+try {
+    Write-Host "Backend: http://localhost:8000"
+    Write-Host "Frontend: http://localhost:5173"
+    Write-Host "Press Ctrl+C to stop both apps."
+    & npm.cmd --prefix (Join-Path $root "src\frontend") run dev -- --host 127.0.0.1
+}
+finally {
+    if ($backend -and -not $backend.HasExited) {
+        Stop-Process -Id $backend.Id -Force
+    }
+}

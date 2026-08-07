@@ -2,7 +2,6 @@
 
 NEIS 공개 API를 활용한 초중고 급식 메뉴 조회 및 분석 웹 애플리케이션입니다.
 
-<!--
 ## 주요 기능
 
 - 학교 이름의 일부로 학교를 검색합니다.
@@ -22,8 +21,8 @@ NEIS 공개 API를 활용한 초중고 급식 메뉴 조회 및 분석 웹 애�
 예정된 소스 디렉터리 구조는 다음과 같습니다.
 
 ```text
-frontend/    React 및 TypeScript 애플리케이션
-backend/     Python API 애플리케이션
+src/frontend/ React 및 TypeScript 애플리케이션
+src/backend/  Python API 애플리케이션
 src/         openapi.json을 포함한 공용 명세
 data/        원본 API 문서
 ```
@@ -42,17 +41,14 @@ git clone https://github.com/justinyoo/battle-school-lunch.git
 cd battle-school-lunch
 ```
 
-프론트엔드와 백엔드의 매니페스트 파일이 생성된 후 로컬 개발 의존성을
-설치합니다.
+로컬 개발 의존성을 설치합니다.
 
 ```sh
-cd frontend
+cd src/frontend
 npm install
 
 cd ../backend
-python -m venv .venv
-# 사용 중인 셸에서 .venv를 활성화한 후 실행합니다.
-python -m pip install -e ".[dev]"
+uv sync --extra dev
 ```
 
 ## 애플리케이션 실행
@@ -63,15 +59,26 @@ python -m pip install -e ".[dev]"
 docker compose up --build
 ```
 
-프론트엔드와 백엔드의 URL은 애플리케이션 구현 시 `compose.yml`에
-정의합니다.
+브라우저는 `http://localhost:5173`, API는 `http://localhost:8000`에서
+접속합니다. `.env.example`을 `.env`로 복사하고 NEIS API 키를 설정하세요.
+
+Docker Compose 없이 로컬에서 두 앱을 함께 실행하려면 다음 스크립트를
+사용할 수 있습니다.
+
+```powershell
+pwsh ./scripts/start-local.ps1
+```
+
+```bash
+bash ./scripts/start-local.sh
+```
 
 ## 개발
 
 프론트엔드 검사를 실행합니다.
 
 ```sh
-cd frontend
+cd src/frontend
 npm run build
 npm test
 ```
@@ -79,14 +86,31 @@ npm test
 백엔드 검사를 실행합니다.
 
 ```sh
-cd backend
-pytest
+cd src/backend
+uv run --extra dev pytest
 ```
 
-프로젝트 구현 작업은 `.github/bootstrap-issues/`의 초기 설정 이슈에서
-관리합니다.
+프론트엔드와 백엔드 테스트를 한 번에 실행하려면 다음 스크립트를 사용합니다.
 
--->
+```powershell
+pwsh ./scripts/test-all.ps1
+```
+
+```bash
+bash ./scripts/test-all.sh
+```
+
+E2E 의존성 설치 후 브라우저를 준비해야 합니다.
+
+```sh
+cd src/e2e
+npm install
+npx playwright install chromium
+npm test
+```
+
+E2E 테스트는 실제 Vite 프론트엔드와 FastAPI 백엔드를 실행하고, 외부 NEIS
+호출만 결정적인 로컬 mock 서버로 대체합니다.
 
 ## 기여하기
 

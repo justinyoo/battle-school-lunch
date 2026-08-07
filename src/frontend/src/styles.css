@@ -1,0 +1,6 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--fontFamilyBase); color: var(--colorNeutralForeground1); }
+.inline { display: flex; gap: 8px; }
+.inline input { flex: 1; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 600px) { .dates { grid-template-columns: 1fr; } }
