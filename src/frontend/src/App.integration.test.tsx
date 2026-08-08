@@ -112,6 +112,10 @@ describe("학교 급식 조회 통합 흐름", () => {
     render(<App />);
     await user.type(screen.getByPlaceholderText("예: 서울고"), "서울");
     await user.click(await screen.findByRole("button", { name: /서울고등학교/ }));
+    const initialDateInputs = screen.getAllByPlaceholderText("yyyy-mm-dd");
+    fireEvent.change(initialDateInputs[0], { target: { value: "2026-08-07" } });
+    fireEvent.change(initialDateInputs[1], { target: { value: "2026-08-07" } });
+
     await user.click(screen.getByRole("button", { name: "급식 조회" }));
     expect(await screen.findByText("국")).toBeInTheDocument();
 
