@@ -112,6 +112,26 @@ npm test
 E2E 테스트는 실제 Vite 프론트엔드와 FastAPI 백엔드를 실행하고, 외부 NEIS
 호출만 결정적인 로컬 mock 서버로 대체합니다.
 
+## Azure 배포
+
+Azure Developer CLI와 Bicep 배포 구성이 포함되어 있습니다. 먼저 Azure CLI와
+`azd`로 로그인한 뒤, 다음처럼 환경을 만들고 NEIS API 키를 설정합니다.
+
+```powershell
+azd auth login
+azd up
+```
+
+`infra/main.parameters.json`은 `${AZURE_ENV_NAME}`과 `${AZURE_LOCATION}`을
+AZD 환경 값으로 치환합니다. `NEIS_API_KEY`가 설정되어 있으면 해당 값을
+사용하고, 설정되지 않은 경우 대화형 `azd up` 실행 시 값을 직접 입력받습니다.
+비밀 값은 파일에 저장하지 않습니다.
+
+`azd up`은 Container Apps 환경, frontend/backend Container Apps, ACR,
+Log Analytics, Application Insights, Key Vault를 프로비저닝하고 이미지를
+빌드·게시합니다. API 키는 Key Vault에 저장되며 프론트엔드 이미지에는 포함되지
+않습니다. 배포 후 출력되는 `FRONTEND_URL`로 웹 앱에 접속하세요.
+
 ## 기여하기
 
 개발 환경 설정 및 Pull Request 안내는
