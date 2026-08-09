@@ -91,8 +91,8 @@ afterEach(() => cleanup());
 
 /** 학교를 두 곳 고른 뒤 열리는 날짜·프롬프트 모달을 차례로 닫는다. */
 const closeSteps = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.click(await screen.findByRole("button", { name: "날짜 확정", hidden: true }));
-  await user.click(await screen.findByRole("button", { name: "프롬프트 확정", hidden: true }));
+  await user.click(await screen.findByRole("button", { name: "날짜 확정" }));
+  await user.click(await screen.findByRole("button", { name: "프롬프트 확정" }));
   await waitFor(() => expect(screen.queryByLabelText("프롬프트")).not.toBeInTheDocument());
 };
 
@@ -105,7 +105,7 @@ describe("급식 배틀 분석 페이지", () => {
     expect(dates).not.toContain("2026-04-01");
   });
 
-  it("학교를 고르면 날짜 모달이 열리고 다음에 프롬프트 모달이 열린다", async () => {
+  it("학교를 고르면 날짜 섹션이 열리고 확정 후 프롬프트 섹션이 열린다", async () => {
     const user = userEvent.setup();
     render(<Analysis />);
 
@@ -130,11 +130,11 @@ describe("급식 배틀 분석 페이지", () => {
     fireEvent.blur(picker);
     await waitFor(() => expect(picker).toHaveValue(target));
 
-    await user.click(screen.getByRole("button", { name: "날짜 확정", hidden: true }));
+    await user.click(screen.getByRole("button", { name: "날짜 확정" }));
     expect(await screen.findByLabelText("프롬프트")).toBeInTheDocument();
     expect(screen.queryByLabelText("분석 날짜")).not.toBeInTheDocument();
 
-    await user.click(await screen.findByRole("button", { name: "프롬프트 확정", hidden: true }));
+    await user.click(await screen.findByRole("button", { name: "프롬프트 확정" }));
     await waitFor(() => expect(screen.queryByLabelText("프롬프트")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "분석 시작" })).toBeEnabled();
   });
