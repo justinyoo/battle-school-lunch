@@ -13,11 +13,24 @@ command -v npm >/dev/null 2>&1 || {
 
 cleanup() {
   for pid in "${BACKEND_PID:-}" "${DEVUI_PID:-}" "${MCP_PID:-}"; do
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-      kill "$pid" 2>/dev/null || true
-      wait "$pid" 2>/dev/null || true
+    if [[ -n "$pid" ]]; then
+      stop_process_tree "$pid"
     fi
   done
+}
+
+stop_process_tree() {
+  local root_pid="$1"
+  local child_pid
+
+  while read -r child_pid; do
+    [[ -n "$child_pid" ]] && stop_process_tree "$child_pid"
+  done < <(pgrep -P "$root_pid" 2>/dev/null || true)
+
+  if kill -0 "$root_pid" 2>/dev/null; then
+    kill "$root_pid" 2>/dev/null || true
+    wait "$root_pid" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT INT TERM
 
