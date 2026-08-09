@@ -106,8 +106,8 @@ docker compose up --build
 `http://localhost:8001/mcp`, 백엔드 상태 확인은 `/health`입니다. Docker 없이
 로컬 개발을 할 때는 `pwsh ./scripts/start-local.ps1` 또는
 `bash ./scripts/start-local.sh`를 사용합니다. 이 스크립트는 백엔드,
-Agent Framework DevUI(`http://localhost:8080`), 프론트엔드를 함께
-실행합니다.
+MCP 서버(`http://localhost:8001/mcp`), Agent Framework
+DevUI(`http://localhost:8080`), 프론트엔드를 함께 실행합니다.
 
 ## 테스트와 검증
 

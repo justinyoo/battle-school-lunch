@@ -12,7 +12,7 @@ command -v npm >/dev/null 2>&1 || {
 }
 
 cleanup() {
-  for pid in "${BACKEND_PID:-}" "${DEVUI_PID:-}"; do
+  for pid in "${BACKEND_PID:-}" "${DEVUI_PID:-}" "${MCP_PID:-}"; do
     if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
       kill "$pid" 2>/dev/null || true
       wait "$pid" 2>/dev/null || true
@@ -28,7 +28,12 @@ BACKEND_PID=$!
 uv run --project "$ROOT/src/backend" --extra dev python -m app.devui &
 DEVUI_PID=$!
 
+MCP_TRANSPORT=streamable-http uv run --project "$ROOT/src/mcp" --extra dev \
+  python -m school_lunch_mcp.server &
+MCP_PID=$!
+
 echo "Backend: http://localhost:8000"
+echo "MCP: http://localhost:8001/mcp"
 echo "DevUI: http://localhost:8080"
 echo "Frontend: http://localhost:5173"
 echo "Press Ctrl+C to stop all apps."
