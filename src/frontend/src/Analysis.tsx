@@ -28,6 +28,8 @@ export const analysisDates = (today = new Date()): string[] => {
 
 const key = (school: School | AnalysisTarget) => `${school.educationOfficeCode}:${school.schoolCode}`;
 
+const label = (school: School) => [school.name, school.schoolKind, school.location].filter(Boolean).join(" · ");
+
 export function Analysis() {
   const styles = useStyles();
   const [pool, setPool] = useState<School[]>([]);
@@ -174,7 +176,7 @@ export function Analysis() {
             <section aria-label="선택한 학교" className={styles.grid}>
               {selected.map(item => (
                 <Button key={key(item)} appearance="primary" aria-pressed disabled>
-                  {item.name} · {item.schoolKind}
+                  {label(item)}
                 </Button>
               ))}
             </section>
@@ -193,7 +195,7 @@ export function Analysis() {
                     onClick={() => toggle(item)}
                     disabled={running}
                   >
-                    {item.name} · {item.schoolKind}
+                    {label(item)}
                   </Button>
                 );
               })}
