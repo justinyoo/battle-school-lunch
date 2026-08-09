@@ -62,17 +62,31 @@ export const isAnalysisResult = (value: unknown): value is AnalysisResult =>
   isBattle(value.battle);
 
 export const fetchRandomSchools = () => read("/api/schools/random", schoolsResponse);
+
+export type WorkflowNode = { id: string; label: string; kind: string; stage: number };
+export type WorkflowEdge = { from: string; to: string; kind: string };
+export type WorkflowGraph = { pattern: string; nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+const isWorkflowGraph = (value: unknown): value is WorkflowGraph =>
+  isRecord(value) &&
+  typeof value.pattern === "string" &&
+  Array.isArray(value.nodes) &&
+  value.nodes.every(item => isRecord(item) && typeof item.id === "string" && typeof item.label === "string" && typeof item.kind === "string" && typeof item.stage === "number") &&
+  Array.isArray(value.edges) &&
+  value.edges.every(item => isRecord(item) && typeof item.from === "string" && typeof item.to === "string" && typeof item.kind === "string");
+export const fetchWorkflowGraph = () => read("/api/analysis/workflow", isWorkflowGraph);
 const promptResponse = (value: unknown): value is { prompt: string } => isRecord(value) && typeof value.prompt === "string";
 export const fetchAnalysisPrompt = (first: string, second: string, date: string) =>
   read(`/api/analysis/prompt?first=${encodeURIComponent(first)}&second=${encodeURIComponent(second)}&date=${date.replaceAll("-", "")}`, promptResponse);
 
 export type AnalysisProgress = { agentName: string; schoolName: string; score: number; weightedScore: number; title: string };
+export type AnalysisStep = { kind: "step-started" | "step-finished"; schoolName: string } | { kind: "school-finished"; schoolName: string } | { kind: "battle-finished" };
 
 export const runAnalysis = async (
   schools: AnalysisTarget[],
   date: string,
   prompt: string,
   onProgress?: (progress: AnalysisProgress) => void,
+  onStep?: (step: AnalysisStep) => void,
 ): Promise<AnalysisResult> => {
   const response = await fetch("/api/analysis/agui", {
     method: "POST",
@@ -113,6 +127,16 @@ export const runAnalysis = async (
         if (typeof area.agentName === "string" && typeof area.schoolName === "string" && typeof area.score === "number" && typeof area.weightedScore === "number" && typeof area.title === "string") {
           onProgress({ agentName: area.agentName, schoolName: area.schoolName, score: area.score, weightedScore: area.weightedScore, title: area.title });
         }
+      }
+      if (onStep) {
+        const stepName = typeof event.stepName === "string" ? event.stepName : "";
+        const schoolName = stepName.startsWith("prepare:") ? stepName.slice("prepare:".length) : "";
+        if (event.type === "STEP_STARTED" && schoolName) onStep({ kind: "step-started", schoolName });
+        if (event.type === "STEP_FINISHED" && schoolName) onStep({ kind: "step-finished", schoolName });
+        if (event.type === "CUSTOM" && event.name === "workflow.school" && isRecord(event.value) && typeof event.value.schoolName === "string") {
+          onStep({ kind: "school-finished", schoolName: event.value.schoolName });
+        }
+        if (event.type === "CUSTOM" && event.name === "workflow.battle") onStep({ kind: "battle-finished" });
       }
       if (event.type === "RUN_ERROR") throw new Error(typeof event.message === "string" ? event.message : "분석에 실패했습니다.");
       if (event.type === "RUN_FINISHED" && isAnalysisResult(event.result)) result = event.result;

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -36,6 +37,36 @@ class AreaMessage:
     result: AreaResult
 
 
+def parse_request(payload: str | dict[str, Any]) -> EvaluationRequest:
+    """DevUI 등 문자열/딕셔너리 입력을 받는 호출자를 위해 요청 객체로 바꾼다."""
+
+    if isinstance(payload, str):
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as error:
+            raise ValueError("입력은 JSON 문자열이어야 합니다.") from error
+    else:
+        data = payload
+    if not isinstance(data, dict):
+        raise ValueError("입력은 JSON 객체여야 합니다.")
+    facts = data.get("facts") or {}
+    if not isinstance(facts, dict):
+        raise ValueError("facts는 JSON 객체여야 합니다.")
+    menu = facts.get("menu") or []
+    if not isinstance(menu, list):
+        raise ValueError("facts.menu는 배열이어야 합니다.")
+    return EvaluationRequest(
+        school_name=str(data.get("schoolName") or data.get("school_name") or "이름 미상 학교"),
+        date=str(data.get("date") or ""),
+        facts=MealFacts(
+            menu=tuple(str(item) for item in menu),
+            origin_info=facts.get("originInfo") or facts.get("origin_info"),
+            calorie_info=facts.get("calorieInfo") or facts.get("calorie_info"),
+            nutrition_info=facts.get("nutritionInfo") or facts.get("nutrition_info"),
+        ),
+    )
+
+
 class PrepareExecutor(Executor):
     """식별 정보를 분리하고 평가 근거만 네 영역으로 fan-out 한다."""
 
@@ -45,6 +76,14 @@ class PrepareExecutor(Executor):
     @handler
     async def run(self, request: EvaluationRequest, ctx: WorkflowContext[EvaluationRequest]) -> None:
         await ctx.send_message(request)
+
+    @handler
+    async def run_from_text(self, payload: str, ctx: WorkflowContext[EvaluationRequest]) -> None:
+        await ctx.send_message(parse_request(payload))
+
+    @handler
+    async def run_from_mapping(self, payload: dict, ctx: WorkflowContext[EvaluationRequest]) -> None:
+        await ctx.send_message(parse_request(payload))
 
 
 class AreaExecutor(Executor):
@@ -108,7 +147,7 @@ def build_workflow(evaluator: AreaEvaluator):
 
 
 def workflow_graph() -> dict[str, Any]:
-    """dev UI에서 사용할 워크플로우 그래프 설명."""
+    """분석 화면 시각화에서 사용할 워크플로우 그래프 설명."""
 
     nodes = [{"id": "prepare-meal-facts", "label": "급식 정보 정규화", "kind": "prepare", "stage": 0}]
     nodes += [

@@ -23,12 +23,21 @@ test("분석 페이지에서 두 학교를 골라 배틀 결과를 확인한다"
   await expect(results.getByText(/총점 .*점/).first()).toBeVisible();
   await expect(results.getByText(/영양·건강성/).first()).toBeVisible();
   await expect(results.getByText(/승자: |동점/).first()).toBeVisible();
+
+  const graph = page.getByRole("region", { name: "워크플로우 그래프" });
+  await expect(graph).toBeVisible();
+  await expect(page.getByTestId("workflow-node-final-synthesis-agent")).toHaveAttribute("data-state", "done");
+  await expect(page.getByTestId("workflow-node-nutrition-health-agent")).toHaveAttribute("data-state", "done");
 });
 
-test("백엔드 dev UI가 워크플로우 그래프를 렌더링한다", async ({ page }) => {
-  const response = await page.request.get("http://127.0.0.1:8000/dev/workflow");
-  expect(response.status()).toBe(200);
-  expect(await response.text()).toContain("concurrent fan-out");
+test("공식 Agent Framework DevUI가 워크플로우를 노출한다", async ({ page }) => {
+  const ui = await page.request.get("http://127.0.0.1:8000/");
+  expect(ui.status()).toBe(200);
+
+  const entities = await page.request.get("http://127.0.0.1:8000/v1/entities");
+  expect(entities.status()).toBe(200);
+  const ids = (await entities.json()).entities.map((entity: { id: string }) => entity.id);
+  expect(ids.some((id: string) => id.includes("school-lunch-evaluation"))).toBe(true);
 
   const graph = await page.request.get("http://127.0.0.1:8000/api/analysis/workflow");
   const body = await graph.json();

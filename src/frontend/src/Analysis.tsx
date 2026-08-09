@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Field, MessageBar, Spinner, Text, Textarea, Title2, makeStyles, tokens } from "@fluentui/react-components";
-import { AnalysisProgress, AnalysisResult, AnalysisTarget, School, fetchAnalysisPrompt, fetchRandomSchools, runAnalysis } from "./api";
+import { AnalysisProgress, AnalysisResult, AnalysisTarget, School, WorkflowGraph, fetchAnalysisPrompt, fetchRandomSchools, fetchWorkflowGraph, runAnalysis } from "./api";
+import { NodeState, WorkflowView } from "./WorkflowView";
 
 const useStyles = makeStyles({
   stack: { display: "grid", gap: tokens.spacingVerticalM },
@@ -37,6 +38,9 @@ export function Analysis() {
   const [promptEdited, setPromptEdited] = useState(false);
   const [result, setResult] = useState<AnalysisResult>();
   const [progress, setProgress] = useState<AnalysisProgress[]>([]);
+  const [graph, setGraph] = useState<WorkflowGraph>();
+  const [nodeStates, setNodeStates] = useState<Record<string, NodeState>>({});
+  const [activeSchool, setActiveSchool] = useState<string>();
   const [loadingPool, setLoadingPool] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +64,18 @@ export function Analysis() {
 
   useEffect(() => {
     void loadPool();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void fetchWorkflowGraph()
+      .then(response => {
+        if (active) setGraph(response);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -92,6 +108,8 @@ export function Analysis() {
     [selected],
   );
 
+  const areaIds = useMemo(() => (graph?.nodes ?? []).filter(node => node.kind === "area").map(node => node.id), [graph]);
+
   const start = async () => {
     if (selected.length !== 2) {
       setError("학교를 정확히 두 곳 선택해 주세요.");
@@ -101,11 +119,29 @@ export function Analysis() {
     setError("");
     setResult(undefined);
     setProgress([]);
+    setNodeStates({});
+    setActiveSchool(undefined);
     setRunning(true);
     try {
-      const response = await runAnalysis(targets, date, prompt, update => {
-        if (requestId === runId.current) setProgress(current => [...current, update]);
-      });
+      const response = await runAnalysis(
+        targets,
+        date,
+        prompt,
+        update => {
+          if (requestId !== runId.current) return;
+          setProgress(current => [...current, update]);
+          setNodeStates(current => ({ ...current, [update.agentName]: "done" }));
+        },
+        step => {
+          if (requestId !== runId.current) return;
+          if (step.kind === "step-started") {
+            setActiveSchool(step.schoolName);
+            setNodeStates(current => ({ ...current, "prepare-meal-facts": "done", ...areaIds.reduce((acc, id) => ({ ...acc, [id]: "running" }), {}), "final-synthesis-agent": "idle" }));
+          }
+          if (step.kind === "school-finished") setNodeStates(current => ({ ...current, "final-synthesis-agent": "done" }));
+          if (step.kind === "battle-finished") setActiveSchool(undefined);
+        },
+      );
       if (requestId === runId.current) setResult(response);
     } catch (e) {
       if (requestId === runId.current) setError(e instanceof Error ? e.message : "분석에 실패했습니다.");
@@ -228,6 +264,8 @@ export function Analysis() {
           ))}
         </section>
       )}
+
+      <WorkflowView graph={graph} nodeStates={nodeStates} progress={progress} activeSchool={activeSchool} />
     </div>
   );
 }

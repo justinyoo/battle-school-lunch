@@ -20,7 +20,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "uv run uvicorn app.main:app --host 127.0.0.1 --port 8000",
+      command: "uv run --extra dev uvicorn app.main:app --host 127.0.0.1 --port 8000",
       cwd: path.resolve(__dirname, "../backend"),
       url: "http://127.0.0.1:8000/health",
       env: { NEIS_BASE_URL: "http://127.0.0.1:8010/hub" },

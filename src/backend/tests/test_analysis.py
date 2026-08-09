@@ -15,7 +15,7 @@ from app import main
 from app.evaluation import DeterministicAreaEvaluator, MealFacts, parse_area_payload
 from app.main import app
 from app.rubric import AREAS_BY_ID, RUBRIC_AREAS, TOTAL_WEIGHT, interpret, total_score
-from app.workflow import WORKFLOW_PATTERN, EvaluationRequest, evaluate_meal, workflow_graph
+from app.workflow import WORKFLOW_PATTERN, EvaluationRequest, build_workflow, evaluate_meal, parse_request, workflow_graph
 
 RICH_MENU = ("기장밥", "돈까스", "미역국", "배추김치", "방울토마토", "시금치나물")
 POOR_MENU = ("백미밥", "치킨너겟", "라면", "단무지", "콜라")
@@ -168,12 +168,49 @@ def test_workflow_endpoint_returns_graph() -> None:
     assert payload["pattern"] == WORKFLOW_PATTERN
 
 
-def test_dev_ui_is_served_by_backend() -> None:
+def test_official_devui_is_mounted_by_backend() -> None:
+    assert main.DEVUI_MOUNTED is True
+    headers = {"Host": "127.0.0.1"}
     with TestClient(app) as client:
-        response = client.get("/dev/workflow")
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "/api/analysis/agui" in response.text
+        entities = client.get("/v1/entities", headers=headers)
+        ui = client.get("/", headers=headers)
+        health = client.get("/health", headers=headers)
+    assert ui.status_code == 200
+    assert health.json() == {"status": "ok"}
+    assert entities.status_code == 200
+    ids = [entity["id"] for entity in entities.json()["entities"]]
+    assert any("school-lunch-evaluation" in entity_id for entity_id in ids)
+
+
+def test_parse_request_accepts_text_and_mapping() -> None:
+    payload = {
+        "schoolName": "테스트고",
+        "date": "20260601",
+        "facts": {"menu": ["백미밥", "미역국"], "calorieInfo": "700 Kcal"},
+    }
+    from_text = parse_request(json.dumps(payload, ensure_ascii=False))
+    from_mapping = parse_request(payload)
+    assert from_text == from_mapping
+    assert from_text.school_name == "테스트고"
+    assert from_text.facts.menu == ("백미밥", "미역국")
+    assert from_text.facts.calorie_info == "700 Kcal"
+
+
+@pytest.mark.parametrize("payload", ["not-json", "[]", '{"facts": ["밥"]}', '{"facts": {"menu": "밥"}}'])
+def test_parse_request_rejects_invalid_payloads(payload: str) -> None:
+    with pytest.raises(ValueError):
+        parse_request(payload)
+
+
+async def test_workflow_runs_from_text_input() -> None:
+    workflow = build_workflow(DeterministicAreaEvaluator())
+    payload = json.dumps(
+        {"schoolName": "테스트고", "date": "20260601", "facts": {"menu": list(RICH_MENU)}},
+        ensure_ascii=False,
+    )
+    outputs = (await workflow.run(payload)).get_outputs()
+    assert outputs and outputs[0]["schoolName"] == "테스트고"
+    assert len(outputs[0]["areas"]) == len(RUBRIC_AREAS)
 
 
 def test_random_schools_sample_multiple_education_offices(monkeypatch: pytest.MonkeyPatch) -> None:

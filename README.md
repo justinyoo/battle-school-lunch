@@ -11,8 +11,10 @@ NEIS 공개 API를 활용한 초중고 급식 메뉴 조회 및 분석 웹 애�
   화면을 제공합니다.
 - `EVALUATION_RUBRIC.md`의 4개 영역을 concurrent fan-out, sequential
   fan-in 멀티 에이전트 워크플로우로 채점하고 승자·패자·동점을 판정합니다.
-- 백엔드에 통합된 dev UI(`/dev/workflow`)에서 워크플로우 실행 상태를
-  시각적으로 확인합니다.
+- 분석 화면 하단에서 워크플로우 그래프와 각 에이전트의 실행 상태를
+  단계별로 시각화합니다.
+- Agent Framework 공식 DevUI를 백엔드 루트(`/`)에 마운트해 워크플로우를
+  직접 실행하고 디버깅할 수 있습니다.
 - 브라우저에서 NEIS API를 직접 호출하지 않고 Python API를 통해 연동합니다.
 - 공식 MCP SDK 1.x 기반 MCP 서버에서 학교·중식 조회 도구를 제공합니다.
 - React 프론트엔드와 Python 백엔드를 Docker Compose로 함께 실행합니다.
@@ -73,7 +75,9 @@ docker compose up --build
 
 브라우저는 `http://localhost:5173`, API는 `http://localhost:8000`에서
 접속합니다. 급식 배틀 분석 화면은 `http://localhost:5173/#/analysis`,
-워크플로우 dev UI는 `http://localhost:8000/dev/workflow`입니다. MCP 서버는
+Agent Framework 공식 DevUI는 `http://localhost:8000/`입니다. DevUI는
+`dev` extra가 설치된 개발 환경에서만 마운트되며, 운영 이미지에서는 자동으로
+건너뜁니다. MCP 서버는
 `http://localhost:8001/mcp`에서 Streamable HTTP
 전송을 제공합니다. `.env.example`을 `.env`로 복사하고 NEIS API 키를 설정하세요.
 
@@ -88,7 +92,8 @@ docker compose up --build
 백엔드는 `EVALUATION_RUBRIC.md`의 네 영역을 담당하는 에이전트를 동시에
 실행하고(concurrent fan-out), 결과를 하나의 종합 에이전트로 모아
 가중 총점과 총평을 만듭니다(sequential fan-in). 진행 상황과 결과는 AG-UI
-프로토콜 SSE 이벤트로 전달됩니다.
+프로토콜 SSE 이벤트로 전달되며, 분석 화면 하단의 워크플로우 그래프가 각
+에이전트의 대기·실행 중·완료 상태와 영역 점수를 실시간으로 보여줍니다.
 
 | 엔드포인트 | 설명 |
 | --- | --- |
@@ -98,7 +103,14 @@ docker compose up --build
 | `GET /api/analysis/prompt` | 두 학교와 날짜로 만든 기본 프롬프트 |
 | `POST /api/analysis` | 배틀 분석 결과를 한 번에 반환 |
 | `POST /api/analysis/agui` | AG-UI 프로토콜 SSE 이벤트 스트림 |
-| `GET /dev/workflow` | 백엔드 통합 워크플로우 시각화 dev UI |
+| `GET /` | Agent Framework 공식 DevUI(개발 환경 전용) |
+
+공식 DevUI에서는 워크플로우를 직접 실행할 수 있습니다. 입력은 다음 형태의
+JSON 문자열을 사용합니다.
+
+```json
+{"schoolName": "예시고", "date": "20260601", "facts": {"menu": ["백미밥", "미역국"]}}
+```
 
 기본값인 `AGENT_PROVIDER=deterministic`은 외부 모델 없이 규칙 기반으로
 채점합니다. GitHub Copilot SDK를 사용하려면 `AGENT_PROVIDER=copilot`을

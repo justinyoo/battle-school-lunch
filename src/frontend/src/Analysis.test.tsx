@@ -2,17 +2,33 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Analysis, analysisDates } from "./Analysis";
-import { fetchAnalysisPrompt, fetchRandomSchools, runAnalysis } from "./api";
+import { fetchAnalysisPrompt, fetchRandomSchools, fetchWorkflowGraph, runAnalysis } from "./api";
 
 vi.mock("./api", () => ({
   fetchRandomSchools: vi.fn(),
   fetchAnalysisPrompt: vi.fn(),
+  fetchWorkflowGraph: vi.fn(),
   runAnalysis: vi.fn(),
 }));
 
 const mockedRandom = vi.mocked(fetchRandomSchools);
 const mockedPrompt = vi.mocked(fetchAnalysisPrompt);
+const mockedGraph = vi.mocked(fetchWorkflowGraph);
 const mockedRun = vi.mocked(runAnalysis);
+
+const graph = {
+  pattern: "concurrent-fan-out-sequential-fan-in",
+  nodes: [
+    { id: "prepare-meal-facts", label: "급식 정보 정규화", kind: "prepare", stage: 0 },
+    { id: "nutrition-health-agent", label: "영양·건강성 (35점)", kind: "area", stage: 1 },
+    { id: "ingredient-safety-agent", label: "식재료·안전성 (25점)", kind: "area", stage: 1 },
+    { id: "final-synthesis-agent", label: "최종 종합 (100점 환산)", kind: "synthesis", stage: 2 },
+  ],
+  edges: [
+    { from: "prepare-meal-facts", to: "nutrition-health-agent", kind: "fan-out" },
+    { from: "nutrition-health-agent", to: "final-synthesis-agent", kind: "fan-in" },
+  ],
+};
 
 const pool = Array.from({ length: 10 }, (_, index) => ({
   educationOfficeCode: "B10",
@@ -67,6 +83,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedRandom.mockResolvedValue({ items: pool });
   mockedPrompt.mockResolvedValue({ prompt: "기본 프롬프트" });
+  mockedGraph.mockResolvedValue(graph);
   mockedRun.mockResolvedValue(result);
 });
 
@@ -142,5 +159,38 @@ describe("급식 배틀 분석 페이지", () => {
     await user.click(screen.getByRole("button", { name: "분석 시작" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("분석에 실패했습니다.");
+  });
+
+  it("결과 아래에 워크플로우 그래프를 단계별로 보여준다", async () => {
+    render(<Analysis />);
+
+    const region = await screen.findByRole("region", { name: "워크플로우 그래프" });
+    expect(within(region).getByText("급식 정보 정규화")).toBeInTheDocument();
+    expect(within(region).getByText("영양·건강성 (35점)")).toBeInTheDocument();
+    expect(within(region).getByText("최종 종합 (100점 환산)")).toBeInTheDocument();
+    expect(screen.getByText(/concurrent-fan-out-sequential-fan-in/)).toBeInTheDocument();
+  });
+
+  it("분석 진행 중 에이전트 노드 상태와 점수를 갱신한다", async () => {
+    mockedRun.mockImplementation(async (_schools, _date, _prompt, onProgress, onStep) => {
+      onStep?.({ kind: "step-started", schoolName: "학교0" });
+      onProgress?.({ agentName: "nutrition-health-agent", schoolName: "학교0", score: 5, weightedScore: 35, title: "영양·건강성" });
+      onStep?.({ kind: "school-finished", schoolName: "학교0" });
+      onStep?.({ kind: "battle-finished" });
+      return result;
+    });
+    const user = userEvent.setup();
+    render(<Analysis />);
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await user.click(screen.getByRole("button", { name: "분석 시작" }));
+
+    await waitFor(() => expect(screen.getByTestId("workflow-node-nutrition-health-agent")).toHaveAttribute("data-state", "done"));
+    expect(screen.getByTestId("workflow-node-prepare-meal-facts")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("workflow-node-final-synthesis-agent")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("workflow-node-ingredient-safety-agent")).toHaveAttribute("data-state", "running");
+    expect(within(screen.getByTestId("workflow-node-nutrition-health-agent")).getByText(/5\/5 · 가중 35.00점/)).toBeInTheDocument();
   });
 });

@@ -10,15 +10,14 @@ import httpx
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from . import analysis
-from .devui import DEV_UI_HTML
 from .providers import create_evaluator
 from .rubric import RUBRIC_AREAS, TOTAL_WEIGHT
-from .workflow import WORKFLOW_PATTERN, workflow_graph
+from .workflow import WORKFLOW_PATTERN, build_workflow, workflow_graph
 
 RANDOM_SCHOOL_POOL_SIZE = 10
 # 전국 17개 시도교육청 코드. 무작위 학교 풀은 특정 지역에 치우치지 않도록
@@ -44,6 +43,7 @@ EDUCATION_OFFICE_CODES = (
 )
 RANDOM_SCHOOL_OFFICE_COUNT = 5
 RANDOM_SCHOOL_PAGE_SIZE = 100
+DEVUI_PATH = "/"
 
 
 class Settings(BaseSettings):
@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     agent_provider: str = "deterministic"
     copilot_model: str = ""
     copilot_cli_path: str = ""
+    devui_host: str = "127.0.0.1"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     @property
@@ -462,6 +463,21 @@ async def analysis_agui(request: AnalysisRequest) -> StreamingResponse:
     return StreamingResponse(stream, media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/dev/workflow", response_class=HTMLResponse)
-async def dev_workflow() -> HTMLResponse:
-    return HTMLResponse(DEV_UI_HTML)
+def mount_devui(host: FastAPI, path: str = DEVUI_PATH) -> bool:
+    """Agent Framework 공식 DevUI를 기존 앱에 마운트한다.
+
+    dev extra가 설치되지 않은 운영 이미지에서는 마운트를 건너뛴다.
+    """
+
+    try:
+        from agent_framework.devui import DevServer
+    except ImportError:
+        logger.info("agent-framework-devui is not installed; skipping DevUI mount")
+        return False
+    server = DevServer(host=settings.devui_host, ui_enabled=True, auth_enabled=False)
+    server.register_entities([build_workflow(_evaluator())])
+    host.mount(path, server.get_app())
+    return True
+
+
+DEVUI_MOUNTED = mount_devui(app)
