@@ -41,7 +41,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "uv run --extra dev python -m app.devui",
+      command: "uv run --extra dev python -c \"from app.main import run_devui; run_devui()\"",
       cwd: path.resolve(__dirname, "../backend"),
       env: {
         NEIS_BASE_URL: "http://127.0.0.1:8010/hub",

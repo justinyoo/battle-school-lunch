@@ -25,7 +25,8 @@ cd "$ROOT"
 uv run --project "$ROOT/src/backend" python -m uvicorn app.main:app --app-dir "$ROOT/src/backend" --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
-uv run --project "$ROOT/src/backend" --extra dev python -m app.devui &
+uv run --project "$ROOT/src/backend" --extra dev python -c \
+  'from app.main import run_devui; run_devui()' &
 DEVUI_PID=$!
 
 MCP_TRANSPORT=streamable-http uv run --project "$ROOT/src/mcp" --extra dev \

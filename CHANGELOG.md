@@ -18,7 +18,7 @@
   풀은 전국 17개 시도교육청에서 균등하게 표본을 뽑아 구성합니다.
 - 분석 화면 아래에 워크플로우 그래프와 에이전트별 실행 상태·점수를
   실시간으로 보여주는 시각화를 추가했습니다.
-- Agent Framework 공식 DevUI를 별도 프로세스(`python -m app.devui`,
+- Agent Framework 공식 DevUI를 별도 프로세스(`python -c 'from app.main import run_devui; run_devui()'`,
   기본 `http://localhost:8080`)로 실행해 워크플로우를 직접 실행하고
   디버깅할 수 있게 했습니다. DevUI는 `dev` extra가 설치된 개발
   환경에서만 사용합니다.
