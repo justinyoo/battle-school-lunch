@@ -116,8 +116,10 @@ uv run --extra dev python -c 'from app.main import run_devui; run_devui()'
 
 아래의 `start-local` 스크립트를 사용하면 MCP 서버와 DevUI도 함께 실행됩니다.
 
-DevUI에서는 워크플로우를 직접 실행할 수 있습니다. 입력은 다음 형태의
-JSON 문자열을 사용합니다.
+DevUI에서는 워크플로우를 직접 실행할 수 있습니다. 메뉴 근거까지 지정하려면
+다음 JSON 문자열을 사용하고, 날짜가 포함된 자연어 비교 요청도 실행할 수
+있습니다. 자연어 입력은 메뉴 원문을 포함하지 않으므로 결과에 미확인 정보가
+표시됩니다.
 
 ```json
 {"schoolName": "예시고", "date": "20260601", "facts": {"menu": ["백미밥", "미역국"]}}

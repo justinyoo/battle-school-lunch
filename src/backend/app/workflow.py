@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +23,7 @@ from .evaluation import AreaEvaluator, AreaResult, MealFacts, summarize
 from .rubric import RUBRIC_AREAS, RubricArea, interpret
 
 WORKFLOW_PATTERN = "concurrent-fan-out-sequential-fan-in"
+_NATURAL_DATE_PATTERN = re.compile(r"(?P<date>\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{8})")
 
 
 @dataclass
@@ -38,13 +40,31 @@ class AreaMessage:
 
 
 def parse_request(payload: str | dict[str, Any]) -> EvaluationRequest:
-    """DevUI 등 문자열/딕셔너리 입력을 받는 호출자를 위해 요청 객체로 바꾼다."""
+    """DevUI 등 문자열/딕셔너리 입력을 받는 호출자를 위해 요청 객체로 바꾼다.
+
+    DevUI의 입력란은 JSON뿐 아니라 자연어도 전달할 수 있다. 자연어에는
+    메뉴 원문이 없으므로 학교·날짜를 식별하고, 빈 근거로 평가한 결과에는
+    평가 영역별 미확인 정보가 포함된다.
+    """
 
     if isinstance(payload, str):
         try:
             data = json.loads(payload)
         except json.JSONDecodeError as error:
-            raise ValueError("입력은 JSON 문자열이어야 합니다.") from error
+            match = _NATURAL_DATE_PATTERN.search(payload)
+            if not match:
+                raise ValueError("자연어 입력에 YYYY-MM-DD 형식의 날짜가 필요합니다.") from error
+            raw_date = match.group("date")
+            normalized_date = re.sub(r"[-./]", "", raw_date)
+            school_name = payload[: match.start()].strip()
+            school_name = re.split(r"\s*(?:와|과)\s*", school_name, maxsplit=1)[0].strip()
+            if not school_name:
+                school_name = "자연어 입력 학교"
+            return EvaluationRequest(
+                school_name=school_name,
+                date=normalized_date,
+                facts=MealFacts(menu=(), origin_info=None, calorie_info=None, nutrition_info=None),
+            )
     else:
         data = payload
     if not isinstance(data, dict):

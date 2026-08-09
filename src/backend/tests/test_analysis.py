@@ -244,6 +244,14 @@ def test_parse_request_accepts_text_and_mapping() -> None:
     assert from_text.facts.calorie_info == "700 Kcal"
 
 
+def test_parse_request_accepts_natural_language_with_date() -> None:
+    request = parse_request("서울고(서울)와 부산고(부산)의 2026-06-01 기준 중식을 비교 분석해 주세요.")
+
+    assert request.school_name == "서울고(서울)"
+    assert request.date == "20260601"
+    assert request.facts.menu == ()
+
+
 @pytest.mark.parametrize("payload", ["not-json", "[]", '{"facts": ["밥"]}', '{"facts": {"menu": "밥"}}'])
 def test_parse_request_rejects_invalid_payloads(payload: str) -> None:
     with pytest.raises(ValueError):
@@ -259,6 +267,16 @@ async def test_workflow_runs_from_text_input() -> None:
     outputs = (await workflow.run(payload)).get_outputs()
     assert outputs and outputs[0]["schoolName"] == "테스트고"
     assert len(outputs[0]["areas"]) == len(RUBRIC_AREAS)
+
+
+async def test_workflow_runs_from_natural_language_input() -> None:
+    workflow = build_workflow(DeterministicAreaEvaluator())
+    outputs = (
+        await workflow.run("서울고(서울)와 부산고(부산)의 2026-06-01 기준 중식을 비교 분석해 주세요.")
+    ).get_outputs()
+
+    assert outputs and outputs[0]["schoolName"] == "서울고(서울)"
+    assert outputs[0]["date"] == "20260601"
 
 
 def test_random_schools_sample_multiple_education_offices(monkeypatch: pytest.MonkeyPatch) -> None:
