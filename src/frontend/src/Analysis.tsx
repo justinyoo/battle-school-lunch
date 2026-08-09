@@ -65,7 +65,6 @@ export function Analysis() {
   const isAllowed = (value: Date) => dates.includes(toIso(value));
   const [date, setDate] = useState(() => toIso(new Date()));
   const [step, setStep] = useState<"none" | "school" | "date" | "prompt">("school");
-  const [dateConfirmed, setDateConfirmed] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [promptEdited, setPromptEdited] = useState(false);
   const [result, setResult] = useState<AnalysisResult>();
@@ -125,8 +124,13 @@ export function Analysis() {
     };
   }, [selected, date, promptEdited]);
 
-  const toggle = (school: School) => {
+  const applyDate = (value: Date) => {
     setResult(undefined);
+    setDate(toIso(value));
+    setStep("prompt");
+  };
+
+  const toggle = (school: School) => {    setResult(undefined);
     setSelected(current => {
       const exists = current.some(item => key(item) === key(school));
       if (exists) return current.filter(item => key(item) !== key(school));
@@ -206,7 +210,7 @@ export function Analysis() {
               <div className={styles.stack}>
                 <div className="inline">
                   {selectionDone ? (
-                    <Button appearance="secondary" onClick={() => { setSelected([]); setStep("school"); setDateConfirmed(false); }} disabled={running}>다시 선택</Button>
+                    <Button appearance="secondary" onClick={() => { setSelected([]); setStep("school"); }} disabled={running}>다시 선택</Button>
                   ) : (
                     <Button appearance="secondary" onClick={() => void loadPool()} disabled={loadingPool || running}>다시 뽑기</Button>
                   )}
@@ -261,21 +265,18 @@ export function Analysis() {
                     onChange={(_, data) => {
                       const value = toDate(data.value);
                       if (!value || !isAllowed(value)) return;
-                      setResult(undefined);
-                      setDate(toIso(value));
+                      applyDate(value);
                     }}
                     onSelectDate={value => {
                       if (!value || !isAllowed(value)) return;
-                      setResult(undefined);
-                      setDate(toIso(value));
+                      applyDate(value);
                     }}
                   />
                 </Field>
-                <Button appearance="primary" onClick={() => { setDateConfirmed(true); setStep("prompt"); }}>날짜 확정</Button>
               </div>
             </AccordionPanel>
           </AccordionItem>
-          <AccordionItem value="prompt" disabled={!dateConfirmed}>
+          <AccordionItem value="prompt" disabled={!selectionDone}>
             <AccordionHeader>프롬프트</AccordionHeader>
             <AccordionPanel>
               <div className={styles.stack}>
@@ -291,7 +292,6 @@ export function Analysis() {
                     }}
                   />
                 </Field>
-                <Button appearance="primary" onClick={() => setStep("none")}>프롬프트 확정</Button>
               </div>
             </AccordionPanel>
           </AccordionItem>
