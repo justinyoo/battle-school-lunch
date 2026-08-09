@@ -201,6 +201,10 @@ describe("급식 배틀 분석 페이지", () => {
     expect(within(region).getByText(/학교1 · 총점 60.00점 · 개선 필요/)).toBeInTheDocument();
     expect(within(region).getAllByText("영양·건강성")).toHaveLength(2);
     expect(within(region).getByText("이 날짜에는 중식 정보가 없습니다.")).toBeInTheDocument();
+
+    const workflow = await screen.findByRole("region", { name: "워크플로우 그래프" });
+    expect(within(workflow).getByText("학교0")).toBeInTheDocument();
+    expect(within(workflow).getByText("학교1")).toBeInTheDocument();
   });
 
   it("분석 실패 시 오류 메시지를 표시한다", async () => {

@@ -341,7 +341,13 @@ export function Analysis() {
         </section>
       )}
 
-      <WorkflowView graph={graph} nodeStates={nodeStates} progress={progress} activeSchool={activeSchool} />
+      <WorkflowView
+        graph={graph}
+        nodeStates={nodeStates}
+        progress={progress}
+        activeSchool={activeSchool}
+        schoolNames={selected.map(item => item.name)}
+      />
     </div>
   );
 }

@@ -7,6 +7,9 @@ const useStyles = makeStyles({
   stages: { display: "grid", gap: tokens.spacingVerticalS },
   stage: { display: "grid", gap: tokens.spacingVerticalXS },
   row: { display: "grid", gap: tokens.spacingHorizontalS, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" },
+  schoolGrid: { display: "grid", gap: tokens.spacingVerticalL, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" },
+  school: { display: "grid", gap: tokens.spacingVerticalS },
+  schoolTitle: { color: tokens.colorBrandForeground1 },
   node: {
     padding: tokens.spacingVerticalS,
     borderRadius: tokens.borderRadiusMedium,
@@ -30,13 +33,30 @@ export type WorkflowViewProps = {
   nodeStates: Record<string, NodeState>;
   progress: AnalysisProgress[];
   activeSchool?: string;
+  schoolNames?: string[];
 };
 
-export function WorkflowView({ graph, nodeStates, progress, activeSchool }: WorkflowViewProps) {
+export function WorkflowView({ graph, nodeStates, progress, activeSchool, schoolNames = [] }: WorkflowViewProps) {
   const styles = useStyles();
   if (!graph) return null;
   const stages = [...new Set(graph.nodes.map(node => node.stage))].sort((a, b) => a - b);
-  const scoreFor = (nodeId: string) => progress.filter(item => item.agentName === nodeId).at(-1);
+  const schools = schoolNames.length > 0 ? schoolNames : [activeSchool ?? "분석 대상 학교"];
+  const scoreFor = (nodeId: string, schoolName: string) =>
+    progress.filter(item => item.agentName === nodeId && item.schoolName === schoolName).at(-1);
+  const derivedStateFor = (nodeId: string, schoolName: string): NodeState => {
+    const schoolProgress = progress.filter(item => item.schoolName === schoolName);
+    const hasProgress = schoolProgress.length > 0;
+    const areaIds = graph.nodes.filter(node => node.kind === "area").map(node => node.id);
+    const allAreasDone = areaIds.every(id => schoolProgress.some(item => item.agentName === id));
+    const node = graph.nodes.find(item => item.id === nodeId);
+    if (node?.kind === "prepare") return hasProgress || activeSchool === schoolName ? "done" : "idle";
+    if (node?.kind === "synthesis") return allAreasDone ? "done" : activeSchool === schoolName ? "running" : "idle";
+    return schoolProgress.some(item => item.agentName === nodeId)
+      ? "done"
+      : activeSchool === schoolName
+        ? "running"
+        : "idle";
+  };
 
   return (
     <Card className={styles.panel}>
@@ -45,31 +65,38 @@ export function WorkflowView({ graph, nodeStates, progress, activeSchool }: Work
           <Title3>워크플로우 시각화</Title3>
           <Text className={styles.meta}>패턴: {graph.pattern}{activeSchool ? ` · 진행 중: ${activeSchool}` : ""}</Text>
         </header>
-        <section aria-label="워크플로우 그래프" className={styles.stages}>
-          {stages.map((stage, index) => (
-            <div className={styles.stage} key={stage}>
-              <Text weight="semibold" className={styles.meta}>{STAGE_LABELS[stage] ?? `${stage + 1}단계`}</Text>
-              <div className={styles.row}>
-                {graph.nodes.filter(node => node.stage === stage).map(node => {
-                  const state = nodeStates[node.id] ?? "idle";
-                  const score = scoreFor(node.id);
-                  return (
-                    <div
-                      key={node.id}
-                      data-testid={`workflow-node-${node.id}`}
-                      data-state={state}
-                      className={`${styles.node} ${state === "running" ? styles.nodeRunning : ""} ${state === "done" ? styles.nodeDone : ""}`}
-                    >
-                      <Text weight="semibold">{node.label}</Text>
-                      <Text className={styles.meta}>
-                        {state === "running" ? "실행 중" : state === "done" ? "완료" : "대기"}
-                        {score ? ` · ${score.score}/5 · 가중 ${score.weightedScore.toFixed(2)}점` : ""}
-                      </Text>
+        <section aria-label="워크플로우 그래프" className={styles.schoolGrid}>
+          {schools.map((schoolName, schoolIndex) => (
+            <div className={styles.school} key={`${schoolName}-${schoolIndex}`}>
+              <Text weight="semibold" className={styles.schoolTitle}>{schoolName}</Text>
+              <div className={styles.stages}>
+                {stages.map((stage, stageIndex) => (
+                  <div className={styles.stage} key={stage}>
+                    <Text weight="semibold" className={styles.meta}>{STAGE_LABELS[stage] ?? `${stage + 1}단계`}</Text>
+                    <div className={styles.row}>
+                      {graph.nodes.filter(node => node.stage === stage).map(node => {
+                        const state = schoolIndex === 0 && nodeStates[node.id] ? nodeStates[node.id] : derivedStateFor(node.id, schoolName);
+                        const score = scoreFor(node.id, schoolName);
+                        return (
+                          <div
+                            key={node.id}
+                            data-testid={`workflow-node-${node.id}${schoolIndex === 0 ? "" : `-${schoolIndex}`}`}
+                            data-state={state}
+                            className={`${styles.node} ${state === "running" ? styles.nodeRunning : ""} ${state === "done" ? styles.nodeDone : ""}`}
+                          >
+                            <Text weight="semibold">{node.label}</Text>
+                            <Text className={styles.meta}>
+                              {state === "running" ? "실행 중" : state === "done" ? "완료" : "대기"}
+                              {score ? ` · ${score.score}/5 · 가중 ${score.weightedScore.toFixed(2)}점` : ""}
+                            </Text>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                    {stageIndex < stages.length - 1 && <div className={styles.arrow} aria-hidden="true">↓ {graph.edges.find(edge => edge.kind === (stage === 0 ? "fan-out" : "fan-in"))?.kind}</div>}
+                  </div>
+                ))}
               </div>
-              {index < stages.length - 1 && <div className={styles.arrow} aria-hidden="true">↓ {graph.edges.find(edge => edge.kind === (stage === 0 ? "fan-out" : "fan-in"))?.kind}</div>}
             </div>
           ))}
         </section>
