@@ -44,7 +44,6 @@ EDUCATION_OFFICE_CODES = (
 )
 RANDOM_SCHOOL_OFFICE_COUNT = 5
 RANDOM_SCHOOL_PAGE_SIZE = 100
-DEVUI_PATH = "/"
 
 
 class Settings(BaseSettings):
@@ -56,6 +55,7 @@ class Settings(BaseSettings):
     copilot_cli_path: str = ""
     mcp_server_url: str = "http://localhost:8001/mcp"
     devui_host: str = "127.0.0.1"
+    devui_port: int = 8080
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     @property
@@ -479,21 +479,19 @@ async def analysis_agui(request: AnalysisRequest) -> StreamingResponse:
     return StreamingResponse(stream, media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
-def mount_devui(host: FastAPI, path: str = DEVUI_PATH) -> bool:
-    """Agent Framework 공식 DevUI를 기존 앱에 마운트한다.
+def run_devui() -> None:
+    """Agent Framework 공식 DevUI를 기본값대로 독립 서버로 실행한다.
 
-    dev extra가 설치되지 않은 운영 이미지에서는 마운트를 건너뛴다.
+    DevUI 프론트엔드는 API를 오리진 루트 기준 절대 경로로 호출하므로
+    다른 앱의 하위 경로에 마운트할 수 없다. 따라서 별도 포트에서 실행한다.
     """
 
-    try:
-        from agent_framework.devui import DevServer
-    except ImportError:
-        logger.info("agent-framework-devui is not installed; skipping DevUI mount")
-        return False
-    server = DevServer(host=settings.devui_host, ui_enabled=True, auth_enabled=False)
-    server.register_entities([build_workflow(_evaluator())])
-    host.mount(path, server.get_app())
-    return True
+    from agent_framework.devui import serve
 
-
-DEVUI_MOUNTED = mount_devui(app)
+    serve(
+        entities=[build_workflow(_evaluator())],
+        host=settings.devui_host,
+        port=settings.devui_port,
+        ui_enabled=True,
+        auth_enabled=False,
+    )

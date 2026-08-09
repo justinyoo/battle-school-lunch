@@ -18,9 +18,10 @@
   풀은 전국 17개 시도교육청에서 균등하게 표본을 뽑아 구성합니다.
 - 분석 화면 아래에 워크플로우 그래프와 에이전트별 실행 상태·점수를
   실시간으로 보여주는 시각화를 추가했습니다.
-- Agent Framework 공식 DevUI를 백엔드 루트(`/`)에 마운트해 워크플로우를
-  직접 실행하고 디버깅할 수 있게 했습니다. DevUI는 `dev` extra가 설치된
-  개발 환경에서만 활성화됩니다.
+- Agent Framework 공식 DevUI를 별도 프로세스(`python -m app.devui`,
+  기본 `http://localhost:8080`)로 실행해 워크플로우를 직접 실행하고
+  디버깅할 수 있게 했습니다. DevUI는 `dev` extra가 설치된 개발
+  환경에서만 사용합니다.
 - AG-UI 프로토콜 SSE 스트림(`POST /api/analysis/agui`)과 분석용 REST
   엔드포인트(`/api/schools/random`, `/api/analysis`,
   `/api/analysis/rubric`, `/api/analysis/workflow`,

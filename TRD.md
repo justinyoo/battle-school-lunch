@@ -169,8 +169,9 @@ FastAPI가 생성하는 누락·형식·길이 검증 오류도 기본 `detail` 
 
 ### 3.4 급식 배틀 분석 API
 
-멀티 에이전트 분석은 기존 백엔드 앱에 통합된다. 별도 서비스나 프로세스를
-추가하지 않고 `/api/analysis` 하위 경로와 루트(`/`) DevUI 마운트만 늘린다.
+멀티 에이전트 분석은 기존 백엔드 앱에 통합된다. 별도 서비스를 추가하지
+않고 `/api/analysis` 하위 경로만 늘린다. DevUI는 백엔드 앱에 마운트하지
+않고 별도 프로세스로 실행한다.
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
@@ -180,7 +181,6 @@ FastAPI가 생성하는 누락·형식·길이 검증 오류도 기본 `detail` 
 | GET | `/api/analysis/prompt` | 두 학교와 날짜로 만든 기본 프롬프트 |
 | POST | `/api/analysis` | 배틀 분석 결과 |
 | POST | `/api/analysis/agui` | AG-UI 프로토콜 SSE 스트림 |
-| GET | `/` | Agent Framework 공식 DevUI(개발 환경 전용) |
 
 입력 경계에서 학교가 정확히 두 곳인지, 서로 다른 학교인지, 날짜가 이번 달
 또는 직전 달인지 확인한다. 위반 시 각각 `INVALID_SCHOOL_SELECTION`,
@@ -230,13 +230,13 @@ E2E는 결정적 평가자를 사용해 외부 서비스에 의존하지 않는�
 
 ### 3.7 Agent Framework 공식 DevUI
 
-워크플로우 디버깅에는 자체 화면 대신 `agent-framework-devui`의 `DevServer`를
-사용한다. `DevServer.get_app()`이 반환하는 FastAPI 앱을 기존 백엔드의
-루트(`/`)에 마운트하므로 별도 프로세스나 포트를 열지 않는다. DevUI 번들이
-`/meta` 같은 절대 경로를 호출해 하위 경로 마운트를 지원하지 않기 때문이며,
-`/api`·`/health` 등 명시적으로 등록된 라우트가 마운트보다 우선하므로 기존
-API는 영향을 받지 않는다. DevUI는 `dev`
-extra에 속하므로 운영 이미지에서는 임포트에 실패하고 마운트를 건너뛴다.
+워크플로우 디버깅에는 자체 화면 대신 `agent-framework-devui`를 기본 동작
+그대로 사용한다. DevUI 프론트엔드 번들이 `/meta`, `/v1/entities` 같은
+오리진 루트 기준 절대 경로를 호출하므로 다른 앱의 하위 경로에 마운트할 수
+없다. 따라서 백엔드 API에 마운트하지 않고 `serve()`로 별도 프로세스에서
+실행하며, 기본 주소는 `http://127.0.0.1:8080`이다. 호스트와 포트는
+`DEVUI_HOST`, `DEVUI_PORT`로 조정한다. DevUI는 `dev` extra에 속하므로
+운영 이미지에서는 실행하지 않는다.
 
 DevUI는 시작 노드에 문자열이나 매핑을 전달하므로 `prepare-meal-facts`는
 `EvaluationRequest` 외에 JSON 문자열과 딕셔너리 입력도 받는다. 잘못된

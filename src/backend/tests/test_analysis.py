@@ -216,18 +216,18 @@ async def test_mcp_loader_maps_arguments_to_get_lunch_meals(monkeypatch: pytest.
     }
 
 
-def test_official_devui_is_mounted_by_backend() -> None:
-    assert main.DEVUI_MOUNTED is True
+def test_backend_root_does_not_host_devui() -> None:
+    """DevUI는 백엔드 앱에 마운트하지 않고 독립 서버로 실행한다."""
+
+    assert not hasattr(main, "DEVUI_PATH")
+    assert callable(main.run_devui)
+    assert main.settings.devui_port == 8080
     headers = {"Host": "127.0.0.1"}
     with TestClient(app) as client:
-        entities = client.get("/v1/entities", headers=headers)
-        ui = client.get("/", headers=headers)
+        root = client.get("/", headers=headers)
         health = client.get("/health", headers=headers)
-    assert ui.status_code == 200
+    assert root.status_code == 404
     assert health.json() == {"status": "ok"}
-    assert entities.status_code == 200
-    ids = [entity["id"] for entity in entities.json()["entities"]]
-    assert any("school-lunch-evaluation" in entity_id for entity_id in ids)
 
 
 def test_parse_request_accepts_text_and_mapping() -> None:

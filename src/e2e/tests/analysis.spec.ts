@@ -37,13 +37,16 @@ test("분석 페이지에서 두 학교를 골라 배틀 결과를 확인한다"
 });
 
 test("공식 Agent Framework DevUI가 워크플로우를 노출한다", async ({ page }) => {
-  const ui = await page.request.get("http://127.0.0.1:8000/");
+  const ui = await page.request.get("http://127.0.0.1:8080/");
   expect(ui.status()).toBe(200);
 
-  const entities = await page.request.get("http://127.0.0.1:8000/v1/entities");
+  const entities = await page.request.get("http://127.0.0.1:8080/v1/entities");
   expect(entities.status()).toBe(200);
   const ids = (await entities.json()).entities.map((entity: { id: string }) => entity.id);
   expect(ids.some((id: string) => id.includes("school-lunch-evaluation"))).toBe(true);
+
+  const root = await page.request.get("http://127.0.0.1:8000/");
+  expect(root.status()).toBe(404);
 
   const graph = await page.request.get("http://127.0.0.1:8000/api/analysis/workflow");
   const body = await graph.json();

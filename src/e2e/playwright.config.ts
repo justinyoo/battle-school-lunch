@@ -41,6 +41,19 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
+      command: "uv run --extra dev python -m app.devui",
+      cwd: path.resolve(__dirname, "../backend"),
+      env: {
+        NEIS_BASE_URL: "http://127.0.0.1:8010/hub",
+        MCP_SERVER_URL: "http://127.0.0.1:8011/mcp",
+        DEVUI_HOST: "127.0.0.1",
+        DEVUI_PORT: "8080",
+      },
+      url: "http://127.0.0.1:8080/health",
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
       command: "npm run dev -- --host 127.0.0.1",
       cwd: path.resolve(__dirname, "../frontend"),
       url: "http://127.0.0.1:5173",
