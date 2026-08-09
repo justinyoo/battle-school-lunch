@@ -7,6 +7,12 @@ NEIS 공개 API를 활용한 초중고 급식 메뉴 조회 및 분석 웹 애�
 - 학교 이름의 일부로 학교를 검색합니다.
 - 학교와 조회할 날짜 범위를 선택합니다.
 - 날짜별 중식 메뉴와 조회 결과 없음 또는 API 오류 상태를 표시합니다.
+- 무작위 학교 10곳 중 두 곳을 골라 중식을 비교 평가하는 급식 배틀 분석
+  화면을 제공합니다.
+- `EVALUATION_RUBRIC.md`의 4개 영역을 concurrent fan-out, sequential
+  fan-in 멀티 에이전트 워크플로우로 채점하고 승자·패자·동점을 판정합니다.
+- 백엔드에 통합된 dev UI(`/dev/workflow`)에서 워크플로우 실행 상태를
+  시각적으로 확인합니다.
 - 브라우저에서 NEIS API를 직접 호출하지 않고 Python API를 통해 연동합니다.
 - 공식 MCP SDK 1.x 기반 MCP 서버에서 학교·중식 조회 도구를 제공합니다.
 - React 프론트엔드와 Python 백엔드를 Docker Compose로 함께 실행합니다.
@@ -66,8 +72,36 @@ docker compose up --build
 ```
 
 브라우저는 `http://localhost:5173`, API는 `http://localhost:8000`에서
-접속합니다. MCP 서버는 `http://localhost:8001/mcp`에서 Streamable HTTP
+접속합니다. 급식 배틀 분석 화면은 `http://localhost:5173/#/analysis`,
+워크플로우 dev UI는 `http://localhost:8000/dev/workflow`입니다. MCP 서버는
+`http://localhost:8001/mcp`에서 Streamable HTTP
 전송을 제공합니다. `.env.example`을 `.env`로 복사하고 NEIS API 키를 설정하세요.
+
+## 멀티 에이전트 급식 배틀 분석
+
+분석 화면은 무작위 학교 10곳을 제시하고 그중 정확히 두 곳과 이번 달 또는
+직전 달의 날짜 하나를 선택하도록 합니다. 기본 프롬프트는 자동으로
+생성되며 실행 전에 자유롭게 수정할 수 있습니다.
+
+백엔드는 `EVALUATION_RUBRIC.md`의 네 영역을 담당하는 에이전트를 동시에
+실행하고(concurrent fan-out), 결과를 하나의 종합 에이전트로 모아
+가중 총점과 총평을 만듭니다(sequential fan-in). 진행 상황과 결과는 AG-UI
+프로토콜 SSE 이벤트로 전달됩니다.
+
+| 엔드포인트 | 설명 |
+| --- | --- |
+| `GET /api/schools/random` | 분석 대상 후보 학교 최대 10곳 |
+| `GET /api/analysis/rubric` | 평가 영역, 가중치, 척도 |
+| `GET /api/analysis/workflow` | 워크플로우 그래프(노드·엣지) |
+| `GET /api/analysis/prompt` | 두 학교와 날짜로 만든 기본 프롬프트 |
+| `POST /api/analysis` | 배틀 분석 결과를 한 번에 반환 |
+| `POST /api/analysis/agui` | AG-UI 프로토콜 SSE 이벤트 스트림 |
+| `GET /dev/workflow` | 백엔드 통합 워크플로우 시각화 dev UI |
+
+기본값인 `AGENT_PROVIDER=deterministic`은 외부 모델 없이 규칙 기반으로
+채점합니다. Microsoft Foundry를 사용하려면 `AGENT_PROVIDER=foundry`와
+함께 `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL`을 설정합니다. 자격 증명이
+없으면 결정적 평가로 자동 전환됩니다.
 
 Docker Compose 없이 로컬에서 두 앱을 함께 실행하려면 다음 스크립트를
 사용할 수 있습니다.

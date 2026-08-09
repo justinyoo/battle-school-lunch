@@ -1,22 +1,36 @@
 from contextlib import asynccontextmanager
 from datetime import date
 import logging
+import random
 import re
+import uuid
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from . import analysis
+from .devui import DEV_UI_HTML
+from .providers import create_evaluator
+from .rubric import RUBRIC_AREAS, TOTAL_WEIGHT
+from .workflow import WORKFLOW_PATTERN, workflow_graph
+
+RANDOM_SCHOOL_POOL_SIZE = 10
+RANDOM_SCHOOL_SEEDS = ("서울", "한빛", "중앙", "대전", "부산")
 
 
 class Settings(BaseSettings):
     neis_api_key: str = ""
     neis_base_url: str = "https://open.neis.go.kr/hub"
     cors_origins: str = "http://localhost:5173"
+    agent_provider: str = "deterministic"
+    foundry_project_endpoint: str = ""
+    foundry_model: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     @property
@@ -64,6 +78,19 @@ class SchoolResponse(BaseModel):
 class MealResponse(BaseModel):
     school: SchoolSummary
     items: list[Meal]
+
+
+class AnalysisSchool(BaseModel):
+    education_office_code: str = Field(alias="educationOfficeCode")
+    school_code: str = Field(alias="schoolCode")
+    name: str
+
+
+class AnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    schools: list[AnalysisSchool]
+    date: str
+    prompt: str = ""
 
 
 def _rows(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -202,7 +229,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="School Lunch API", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET", "POST"], allow_headers=["*"])
 
 
 @app.exception_handler(ApiError)
@@ -251,3 +278,133 @@ async def meals(
     rows = _rows(payload, "mealServiceDietInfo")
     school_name = next((str(row.get("SCHUL_NM")) for row in rows if row.get("SCHUL_NM")), "")
     return MealResponse(school=SchoolSummary(educationOfficeCode=education_office_code, schoolCode=school_code, name=school_name), items=sorted(normalize_meals(payload), key=lambda item: item.date))
+
+
+def _evaluator():
+    return create_evaluator(settings.agent_provider, settings.foundry_project_endpoint, settings.foundry_model)
+
+
+async def _load_meals(education_office_code: str, school_code: str, target_date: str) -> dict[str, Any]:
+    response = await meals(
+        education_office_code=education_office_code,
+        school_code=school_code,
+        from_date=target_date,
+        to_date=target_date,
+    )
+    return response.model_dump(by_alias=True)
+
+
+def _validate_analysis_date(value: str) -> str:
+    if not re.fullmatch(r"\d{8}", value):
+        raise ApiError("INVALID_DATE", "날짜 형식이 올바르지 않습니다.", 400)
+    try:
+        parsed = date.fromisoformat(f"{value[:4]}-{value[4:6]}-{value[6:]}")
+    except ValueError as exc:
+        raise ApiError("INVALID_DATE", "날짜 형식이 올바르지 않습니다.", 400) from exc
+    today = date.today()
+    this_month = (today.year, today.month)
+    previous_month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+    if (parsed.year, parsed.month) not in (this_month, previous_month):
+        raise ApiError("INVALID_ANALYSIS_DATE", "이번 달 또는 직전 달의 날짜만 분석할 수 있습니다.", 400)
+    return value
+
+
+def _validate_analysis_schools(schools: list[AnalysisSchool]) -> list[dict[str, str]]:
+    if len(schools) != 2:
+        raise ApiError("INVALID_SCHOOL_SELECTION", "학교를 정확히 두 곳 선택해 주세요.", 400)
+    codes = {(item.education_office_code, item.school_code) for item in schools}
+    if len(codes) != 2:
+        raise ApiError("INVALID_SCHOOL_SELECTION", "서로 다른 학교 두 곳을 선택해 주세요.", 400)
+    for item in schools:
+        validate_code(item.education_office_code, "education_office_code")
+        validate_code(item.school_code, "school_code")
+    return [
+        {
+            "educationOfficeCode": item.education_office_code,
+            "schoolCode": item.school_code,
+            "name": item.name.strip() or item.school_code,
+        }
+        for item in schools
+    ]
+
+
+@app.get("/api/schools/random", response_model=SchoolResponse)
+async def random_schools() -> SchoolResponse:
+    collected: dict[tuple[str, str], School] = {}
+    for seed in RANDOM_SCHOOL_SEEDS:
+        payload = await fetch_neis("/schoolInfo", {"SCHUL_NM": seed})
+        for item in normalize_schools(payload):
+            collected[(item.education_office_code, item.school_code)] = item
+        if len(collected) >= RANDOM_SCHOOL_POOL_SIZE:
+            break
+    pool = list(collected.values())
+    if not pool:
+        return SchoolResponse(items=[])
+    sample_size = min(RANDOM_SCHOOL_POOL_SIZE, len(pool))
+    return SchoolResponse(items=random.sample(pool, sample_size))
+
+
+@app.get("/api/analysis/rubric")
+async def analysis_rubric() -> dict[str, Any]:
+    return {
+        "totalWeight": TOTAL_WEIGHT,
+        "pattern": WORKFLOW_PATTERN,
+        "provider": settings.agent_provider,
+        "areas": [
+            {
+                "id": area.id,
+                "agentName": area.agent_name,
+                "title": area.title,
+                "weight": area.weight,
+                "purpose": area.purpose,
+                "checkpoints": list(area.checkpoints),
+                "scale": list(area.scale),
+            }
+            for area in RUBRIC_AREAS
+        ],
+    }
+
+
+@app.get("/api/analysis/workflow")
+async def analysis_workflow() -> dict[str, Any]:
+    return workflow_graph()
+
+
+@app.get("/api/analysis/prompt")
+async def analysis_prompt(
+    first: str = Query(min_length=1, max_length=50),
+    second: str = Query(min_length=1, max_length=50),
+    target_date: str = Query(alias="date", pattern=r"^\d{8}$"),
+) -> dict[str, str]:
+    _validate_analysis_date(target_date)
+    return {"prompt": analysis.build_prompt(first.strip(), second.strip(), target_date)}
+
+
+@app.post("/api/analysis")
+async def analysis_run(request: AnalysisRequest) -> dict[str, Any]:
+    schools = _validate_analysis_schools(request.schools)
+    target_date = _validate_analysis_date(request.date)
+    prompt = request.prompt.strip() or analysis.build_prompt(schools[0]["name"], schools[1]["name"], target_date)
+    return await analysis.analyze_battle(_evaluator(), _load_meals, schools, target_date, prompt)
+
+
+@app.post("/api/analysis/agui")
+async def analysis_agui(request: AnalysisRequest) -> StreamingResponse:
+    schools = _validate_analysis_schools(request.schools)
+    target_date = _validate_analysis_date(request.date)
+    prompt = request.prompt.strip() or analysis.build_prompt(schools[0]["name"], schools[1]["name"], target_date)
+    stream = analysis.stream_agui_events(
+        _evaluator(),
+        _load_meals,
+        schools,
+        target_date,
+        prompt,
+        thread_id=uuid.uuid4().hex,
+        run_id=uuid.uuid4().hex,
+    )
+    return StreamingResponse(stream, media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/dev/workflow", response_class=HTMLResponse)
+async def dev_workflow() -> HTMLResponse:
+    return HTMLResponse(DEV_UI_HTML)

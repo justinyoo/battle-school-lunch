@@ -1,0 +1,146 @@
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Analysis, analysisDates } from "./Analysis";
+import { fetchAnalysisPrompt, fetchRandomSchools, runAnalysis } from "./api";
+
+vi.mock("./api", () => ({
+  fetchRandomSchools: vi.fn(),
+  fetchAnalysisPrompt: vi.fn(),
+  runAnalysis: vi.fn(),
+}));
+
+const mockedRandom = vi.mocked(fetchRandomSchools);
+const mockedPrompt = vi.mocked(fetchAnalysisPrompt);
+const mockedRun = vi.mocked(runAnalysis);
+
+const pool = Array.from({ length: 10 }, (_, index) => ({
+  educationOfficeCode: "B10",
+  schoolCode: `100${index}`,
+  name: `학교${index}`,
+  schoolKind: "고등학교",
+  location: "서울",
+}));
+
+const area = (id: string, title: string, weight: number, score: number, weighted: number) => ({
+  areaId: id,
+  agentName: `${id}-agent`,
+  title,
+  weight,
+  score,
+  weightedScore: weighted,
+  rationale: `${title} 근거`,
+  evidence: [],
+  mode: "deterministic",
+});
+
+const result = {
+  prompt: "프롬프트",
+  date: "20260807",
+  pattern: "concurrent-fan-out-sequential-fan-in",
+  schools: [
+    {
+      schoolName: "학교0",
+      date: "20260807",
+      total: 82.5,
+      interpretation: "우수",
+      commentary: "학교0 총평",
+      areas: [area("nutrition-health", "영양·건강성", 35, 5, 35)],
+      menu: ["기장밥", "미역국"],
+      hasMeal: true,
+    },
+    {
+      schoolName: "학교1",
+      date: "20260807",
+      total: 60.0,
+      interpretation: "개선 필요",
+      commentary: "학교1 총평",
+      areas: [area("nutrition-health", "영양·건강성", 35, 3, 21)],
+      menu: [],
+      hasMeal: false,
+    },
+  ],
+  battle: { outcome: "win" as const, winner: "학교0", loser: "학교1", margin: 22.5, summary: "학교0가 이겼습니다." },
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockedRandom.mockResolvedValue({ items: pool });
+  mockedPrompt.mockResolvedValue({ prompt: "기본 프롬프트" });
+  mockedRun.mockResolvedValue(result);
+});
+
+afterEach(() => cleanup());
+
+describe("급식 배틀 분석 페이지", () => {
+  it("이번 달과 직전 달의 날짜만 선택 후보로 제공한다", () => {
+    const dates = analysisDates(new Date(2026, 2, 15));
+    expect(dates[0]).toBe("2026-02-01");
+    expect(dates.at(-1)).toBe("2026-03-31");
+    expect(dates).not.toContain("2026-01-31");
+    expect(dates).not.toContain("2026-04-01");
+  });
+
+  it("무작위 학교 10곳을 보여주고 두 곳까지만 선택하게 한다", async () => {
+    const user = userEvent.setup();
+    render(<Analysis />);
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    expect(within(list).getAllByRole("button")).toHaveLength(10);
+    expect(screen.getByRole("button", { name: "분석 시작" })).toBeDisabled();
+
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+
+    expect(within(list).getByRole("button", { name: /학교2/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "분석 시작" })).toBeEnabled();
+  });
+
+  it("선택한 두 학교로 기본 프롬프트를 만들고 편집할 수 있다", async () => {
+    const user = userEvent.setup();
+    render(<Analysis />);
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+
+    await waitFor(() => expect(mockedPrompt).toHaveBeenCalledWith("학교0", "학교1", expect.any(String)));
+    const textarea = await screen.findByLabelText("프롬프트");
+    await waitFor(() => expect(textarea).toHaveValue("기본 프롬프트"));
+
+    await user.clear(textarea);
+    await user.type(textarea, "직접 수정한 프롬프트");
+    expect(textarea).toHaveValue("직접 수정한 프롬프트");
+  });
+
+  it("분석 결과의 승자, 총점, 영역별 점수를 표시한다", async () => {
+    const user = userEvent.setup();
+    render(<Analysis />);
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await user.click(screen.getByRole("button", { name: "분석 시작" }));
+
+    const region = await screen.findByRole("region", { name: "분석 결과" });
+    expect(within(region).getByText("승자: 학교0")).toBeInTheDocument();
+    expect(within(region).getByText(/패자: 학교1/)).toBeInTheDocument();
+    expect(within(region).getByText(/학교0 · 총점 82.50점 · 우수/)).toBeInTheDocument();
+    expect(within(region).getByText(/학교1 · 총점 60.00점 · 개선 필요/)).toBeInTheDocument();
+    expect(within(region).getAllByText("영양·건강성")).toHaveLength(2);
+    expect(within(region).getByText("이 날짜에는 중식 정보가 없습니다.")).toBeInTheDocument();
+  });
+
+  it("분석 실패 시 오류 메시지를 표시한다", async () => {
+    mockedRun.mockRejectedValue(new Error("분석에 실패했습니다."));
+    const user = userEvent.setup();
+    render(<Analysis />);
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await user.click(screen.getByRole("button", { name: "분석 시작" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("분석에 실패했습니다.");
+  });
+});

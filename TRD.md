@@ -159,6 +159,56 @@ FastAPI가 생성하는 누락·형식·길이 검증 오류도 기본 `detail` 
 이 봉투가 유효할 때만 서버 메시지를 표시하고 그 외 응답에는 일반 오류
 문구를 사용한다.
 
+### 3.4 급식 배틀 분석 API
+
+멀티 에이전트 분석은 기존 백엔드 앱에 통합된다. 별도 서비스나 프로세스를
+추가하지 않고 `/api/analysis` 하위 경로와 `/dev/workflow` dev UI만 늘린다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/schools/random` | 후보 학교 최대 10곳을 무작위로 반환 |
+| GET | `/api/analysis/rubric` | 평가 영역, 가중치, 5점 척도 |
+| GET | `/api/analysis/workflow` | 워크플로우 노드와 엣지 그래프 |
+| GET | `/api/analysis/prompt` | 두 학교와 날짜로 만든 기본 프롬프트 |
+| POST | `/api/analysis` | 배틀 분석 결과 |
+| POST | `/api/analysis/agui` | AG-UI 프로토콜 SSE 스트림 |
+| GET | `/dev/workflow` | 백엔드 통합 워크플로우 시각화 화면 |
+
+입력 경계에서 학교가 정확히 두 곳인지, 서로 다른 학교인지, 날짜가 이번 달
+또는 직전 달인지 확인한다. 위반 시 각각 `INVALID_SCHOOL_SELECTION`,
+`INVALID_ANALYSIS_DATE` 코드로 400을 반환한다.
+
+### 3.5 멀티 에이전트 워크플로우
+
+Microsoft Agent Framework의 `WorkflowBuilder`로 concurrent fan-out,
+sequential fan-in 구조를 구성한다.
+
+1. `prepare-meal-facts`가 급식 응답을 평가용 사실 집합으로 정규화한다.
+2. `add_fan_out_edges`로 네 영역 에이전트를 동시에 실행한다.
+   `nutrition-health-agent`(35점), `ingredient-safety-agent`(25점),
+   `menu-variety-preference-agent`(25점), `sustainability-value-agent`(15점).
+3. `add_fan_in_edges`로 `final-synthesis-agent`가 결과를 모아 가중 총점과
+   총평을 만든다.
+4. 두 학교의 총점을 비교해 승자·패자 또는 동점을 판정한다.
+
+영역별 점수는 5점 척도이며 `점수 / 5 × 가중치`로 환산한다. 가중치 합은
+항상 100이다. 근거가 없는 항목은 추정하지 않고 확인 불가로 남긴다.
+
+`AGENT_PROVIDER=foundry`이고 `FOUNDRY_PROJECT_ENDPOINT`,
+`FOUNDRY_MODEL`이 있으면 Microsoft Foundry 모델로 채점하고, 그렇지 않으면
+외부 호출 없는 결정적 평가자로 동작한다. 테스트와 E2E는 결정적 평가자를
+사용해 외부 서비스에 의존하지 않는다.
+
+### 3.6 AG-UI 이벤트 경계
+
+`/api/analysis/agui`는 `text/event-stream`으로 `RUN_STARTED`,
+`CUSTOM(workflow.graph)`, 학교별 `STEP_STARTED`,
+`CUSTOM(workflow.area)`, `CUSTOM(workflow.school)`, `STEP_FINISHED`,
+`CUSTOM(workflow.battle)`, `TEXT_MESSAGE_START|CONTENT|END`,
+`RUN_FINISHED` 순으로 이벤트를 보낸다. 실패 시 상세 원인 대신
+`RUN_ERROR`와 일반화된 메시지만 전달한다. nginx 프록시에서는 이 경로의
+버퍼링을 끈다.
+
 ## 4. 데이터 흐름
 
 ### 4.1 학교 검색
