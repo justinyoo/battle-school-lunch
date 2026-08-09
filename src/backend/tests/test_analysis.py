@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import analysis
+from app import main
 from app.evaluation import DeterministicAreaEvaluator, MealFacts, parse_area_payload
 from app.main import app
 from app.rubric import AREAS_BY_ID, RUBRIC_AREAS, TOTAL_WEIGHT, interpret, total_score
@@ -173,6 +174,97 @@ def test_dev_ui_is_served_by_backend() -> None:
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "/api/analysis/agui" in response.text
+
+
+def test_random_schools_sample_multiple_education_offices(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested: list[str] = []
+
+    async def fake_fetch(path: str, params: dict[str, str]) -> dict[str, Any]:
+        assert path == "/schoolInfo"
+        office = params["ATPT_OFCDC_SC_CODE"]
+        requested.append(office)
+        rows = [
+            {
+                "ATPT_OFCDC_SC_CODE": office,
+                "SD_SCHUL_CODE": f"{office}{index:05d}",
+                "SCHUL_NM": f"{office}학교{index}",
+                "SCHUL_KND_SC_NM": "고등학교",
+            }
+            for index in range(5)
+        ]
+        return {"schoolInfo": [{"head": [{"list_total_count": len(rows)}]}, {"row": rows}]}
+
+    monkeypatch.setattr(main, "fetch_neis", fake_fetch)
+    with TestClient(app) as client:
+        items = client.get("/api/schools/random").json()["items"]
+
+    assert len(requested) == main.RANDOM_SCHOOL_OFFICE_COUNT
+    assert len(set(requested)) == main.RANDOM_SCHOOL_OFFICE_COUNT
+    assert set(requested) <= set(main.EDUCATION_OFFICE_CODES)
+    assert len(items) == main.RANDOM_SCHOOL_POOL_SIZE
+    # 특정 지역에 치우치지 않고 여러 시도교육청 학교가 함께 포함된다.
+    assert len({item["educationOfficeCode"] for item in items}) > 1
+
+
+def test_random_schools_read_a_random_page_per_office(monkeypatch: pytest.MonkeyPatch) -> None:
+    """이름순 첫 페이지에 쏠리지 않도록 전체 건수 기반으로 임의 페이지를 읽는다."""
+
+    pages: list[str] = []
+
+    async def fake_fetch(path: str, params: dict[str, str]) -> dict[str, Any]:
+        office = params["ATPT_OFCDC_SC_CODE"]
+        pages.append(params.get("pIndex", "1"))
+        return {
+            "schoolInfo": [
+                {"head": [{"list_total_count": 1000}]},
+                {"row": [{"ATPT_OFCDC_SC_CODE": office, "SD_SCHUL_CODE": f"{office}1", "SCHUL_NM": f"{office}학교"}]},
+            ]
+        }
+
+    monkeypatch.setattr(main, "fetch_neis", fake_fetch)
+    with TestClient(app) as client:
+        client.get("/api/schools/random")
+
+    # 교육청마다 건수 확인용 1페이지와 임의 페이지를 각각 한 번씩 읽는다.
+    assert len(pages) == main.RANDOM_SCHOOL_OFFICE_COUNT * 2
+    requested_pages = {int(page) for page in pages}
+    assert requested_pages <= set(range(1, 1000 // main.RANDOM_SCHOOL_PAGE_SIZE + 1))
+
+
+@pytest.mark.parametrize(
+    "payload,expected",
+    [
+        ({"schoolInfo": [{"head": [{"list_total_count": 250}]}]}, 3),
+        ({"schoolInfo": [{"head": [{"list_total_count": 100}]}]}, 1),
+        ({"schoolInfo": [{"head": [{"list_total_count": 0}]}]}, 1),
+        ({"schoolInfo": [{"head": [{"list_total_count": "bad"}]}]}, 1),
+        ({"schoolInfo": [{"row": []}]}, 1),
+        ({}, 1),
+    ],
+)
+def test_last_page_handles_counts_and_malformed_heads(payload: dict[str, Any], expected: int) -> None:
+    assert main._last_page(payload, 100) == expected
+
+
+def test_random_schools_skip_failing_education_offices(monkeypatch: pytest.MonkeyPatch) -> None:
+    survivor = main.EDUCATION_OFFICE_CODES[0]
+
+    async def fake_fetch(path: str, params: dict[str, str]) -> dict[str, Any]:
+        if params["ATPT_OFCDC_SC_CODE"] != survivor:
+            raise main.ApiError("UPSTREAM_UNAVAILABLE", "unavailable")
+        return {
+            "schoolInfo": [
+                {"row": [{"ATPT_OFCDC_SC_CODE": survivor, "SD_SCHUL_CODE": "1000001", "SCHUL_NM": "생존학교"}]}
+            ]
+        }
+
+    monkeypatch.setattr(main, "fetch_neis", fake_fetch)
+    monkeypatch.setattr(main.random, "sample", lambda population, count: list(population)[:count])
+    with TestClient(app) as client:
+        response = client.get("/api/schools/random")
+
+    assert response.status_code == 200
+    assert [item["name"] for item in response.json()["items"]] == ["생존학교"]
 
 
 def test_analysis_rejects_wrong_school_count() -> None:

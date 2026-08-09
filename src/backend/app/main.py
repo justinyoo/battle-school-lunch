@@ -21,7 +21,29 @@ from .rubric import RUBRIC_AREAS, TOTAL_WEIGHT
 from .workflow import WORKFLOW_PATTERN, workflow_graph
 
 RANDOM_SCHOOL_POOL_SIZE = 10
-RANDOM_SCHOOL_SEEDS = ("서울", "한빛", "중앙", "대전", "부산")
+# 전국 17개 시도교육청 코드. 무작위 학교 풀은 특정 지역에 치우치지 않도록
+# 매번 서로 다른 교육청을 골라 균등하게 표본을 만든다.
+EDUCATION_OFFICE_CODES = (
+    "B10",  # 서울
+    "C10",  # 부산
+    "D10",  # 대구
+    "E10",  # 인천
+    "F10",  # 광주
+    "G10",  # 대전
+    "H10",  # 울산
+    "I10",  # 세종
+    "J10",  # 경기
+    "K10",  # 강원
+    "M10",  # 충북
+    "N10",  # 충남
+    "P10",  # 전북
+    "Q10",  # 전남
+    "R10",  # 경북
+    "S10",  # 경남
+    "T10",  # 제주
+)
+RANDOM_SCHOOL_OFFICE_COUNT = 5
+RANDOM_SCHOOL_PAGE_SIZE = 100
 
 
 class Settings(BaseSettings):
@@ -102,6 +124,26 @@ def _rows(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
         if isinstance(entry, dict) and isinstance(entry.get("row"), list):
             result.extend(row for row in entry["row"] if isinstance(row, dict))
     return result
+
+
+def _last_page(payload: dict[str, Any], page_size: int) -> int:
+    """`schoolInfo` head의 전체 건수로 마지막 페이지 번호를 계산한다."""
+
+    section = payload.get("schoolInfo", [])
+    if not isinstance(section, list):
+        return 1
+    for entry in section:
+        if not isinstance(entry, dict) or not isinstance(entry.get("head"), list):
+            continue
+        for item in entry["head"]:
+            if not isinstance(item, dict) or "list_total_count" not in item:
+                continue
+            try:
+                total = int(item["list_total_count"])
+            except (TypeError, ValueError):
+                return 1
+            return max(1, -(-total // page_size))
+    return 1
 
 
 def normalize_schools(payload: dict[str, Any]) -> list[School]:
@@ -330,13 +372,28 @@ def _validate_analysis_schools(schools: list[AnalysisSchool]) -> list[dict[str, 
 
 @app.get("/api/schools/random", response_model=SchoolResponse)
 async def random_schools() -> SchoolResponse:
+    """전국 시도교육청에서 균등하게 표본을 뽑아 무작위 학교 풀을 만든다."""
+
+    offices = random.sample(EDUCATION_OFFICE_CODES, RANDOM_SCHOOL_OFFICE_COUNT)
+    per_office = -(-RANDOM_SCHOOL_POOL_SIZE // RANDOM_SCHOOL_OFFICE_COUNT)
     collected: dict[tuple[str, str], School] = {}
-    for seed in RANDOM_SCHOOL_SEEDS:
-        payload = await fetch_neis("/schoolInfo", {"SCHUL_NM": seed})
-        for item in normalize_schools(payload):
+    for office in offices:
+        params = {"ATPT_OFCDC_SC_CODE": office, "pSize": str(RANDOM_SCHOOL_PAGE_SIZE)}
+        try:
+            payload = await fetch_neis("/schoolInfo", params)
+            # 이름순 첫 페이지에 쏠리지 않도록 전체 건수 안에서 임의 페이지를 다시 읽는다.
+            last_page = _last_page(payload, RANDOM_SCHOOL_PAGE_SIZE)
+            if last_page > 1:
+                params["pIndex"] = str(random.randint(1, last_page))
+                payload = await fetch_neis("/schoolInfo", params)
+        except ApiError:
+            # 일부 교육청 조회가 실패해도 나머지 지역으로 풀을 구성한다.
+            continue
+        candidates = normalize_schools(payload)
+        if not candidates:
+            continue
+        for item in random.sample(candidates, min(per_office, len(candidates))):
             collected[(item.education_office_code, item.school_code)] = item
-        if len(collected) >= RANDOM_SCHOOL_POOL_SIZE:
-            break
     pool = list(collected.values())
     if not pool:
         return SchoolResponse(items=[])

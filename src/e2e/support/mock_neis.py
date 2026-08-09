@@ -46,8 +46,6 @@ ANALYSIS_SCHOOLS = [
 
 ALL_SCHOOLS = SCHOOLS + ANALYSIS_SCHOOLS
 
-RANDOM_SEEDS = {"한빛", "중앙", "대전", "부산"}
-
 
 def result(code: str, message: str) -> dict[str, object]:
     return {"RESULT": {"CODE": code, "MESSAGE": message}}
@@ -86,18 +84,34 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path.endswith("/schoolInfo"):
             term = params.get("SCHUL_NM", [""])[0]
+            office = params.get("ATPT_OFCDC_SC_CODE", [""])[0]
             if term == "오류학교":
                 self.send_json(result("ERROR-300", "deterministic upstream failure"))
             elif term == "없는학교":
                 self.send_json(result("INFO-200", "해당하는 데이터가 없습니다."))
-            else:
-                # 무작위 학교 풀은 분석 전용 학교를 함께 노출한다.
-                rows = ALL_SCHOOLS if term in RANDOM_SEEDS else SCHOOLS
+            elif office and not term:
+                # 무작위 학교 풀은 교육청 코드로 조회한다. 분석 전용 학교만
+                # 반환해 표본 추출과 무관하게 두 학교가 항상 풀에 포함되도록 한다.
+                rows = ANALYSIS_SCHOOLS
                 self.send_json(
                     {
                         "schoolInfo": [
                             {"head": [{"list_total_count": len(rows)}, result("INFO-000", "정상 처리되었습니다.")]},
                             {"row": rows},
+                        ]
+                    }
+                )
+            else:
+                self.send_json(
+                    {
+                        "schoolInfo": [
+                            {
+                                "head": [
+                                    {"list_total_count": len(SCHOOLS)},
+                                    result("INFO-000", "정상 처리되었습니다."),
+                                ]
+                            },
+                            {"row": SCHOOLS},
                         ]
                     }
                 )
