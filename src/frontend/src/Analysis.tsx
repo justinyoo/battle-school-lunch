@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Field, MessageBar, Spinner, Text, Textarea, Title2, makeStyles, tokens } from "@fluentui/react-components";
 import { AnalysisProgress, AnalysisResult, AnalysisTarget, School, WorkflowGraph, fetchAnalysisPrompt, fetchRandomSchools, fetchWorkflowGraph, runAnalysis } from "./api";
+import { DatePicker } from "@fluentui/react-datepicker-compat";
 import { NodeState, WorkflowView } from "./WorkflowView";
 
 const useStyles = makeStyles({
@@ -28,6 +29,15 @@ export const analysisDates = (today = new Date()): string[] => {
 
 const key = (school: School | AnalysisTarget) => `${school.educationOfficeCode}:${school.schoolCode}`;
 
+const toIsoOrEmpty = (value?: Date) => (value ? toIso(value) : "");
+
+const toDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return toIso(parsed) === value ? parsed : undefined;
+};
+
 const label = (school: School) => [school.name, school.schoolKind, school.location].filter(Boolean).join(" · ");
 
 export function Analysis() {
@@ -35,6 +45,9 @@ export function Analysis() {
   const [pool, setPool] = useState<School[]>([]);
   const [selected, setSelected] = useState<School[]>([]);
   const [dates] = useState(() => analysisDates());
+  const [minDate] = useState(() => toDate(dates[0]));
+  const [maxDate] = useState(() => toDate(dates[dates.length - 1]));
+  const isAllowed = (value: Date) => dates.includes(toIso(value));
   const [date, setDate] = useState(() => toIso(new Date()));
   const [prompt, setPrompt] = useState("");
   const [promptEdited, setPromptEdited] = useState(false);
@@ -207,19 +220,28 @@ export function Analysis() {
       <Card className={styles.panel}>
         <div className={styles.stack}>
           <Field label="분석 날짜" hint="이번 달과 직전 달의 날짜만 선택할 수 있습니다.">
-            <select
+            <DatePicker
               aria-label="분석 날짜"
-              value={date}
+              value={toDate(date)}
+              minDate={minDate}
+              maxDate={maxDate}
               disabled={running}
-              onChange={event => {
+              allowTextInput
+              placeholder="yyyy-mm-dd"
+              formatDate={toIsoOrEmpty}
+              parseDateFromString={value => toDate(value) ?? null}
+              onChange={(_, data) => {
+                const value = toDate(data.value);
+                if (!value || !isAllowed(value)) return;
                 setResult(undefined);
-                setDate(event.target.value);
+                setDate(toIso(value));
               }}
-            >
-              {dates.map(item => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
+              onSelectDate={value => {
+                if (!value || !isAllowed(value)) return;
+                setResult(undefined);
+                setDate(toIso(value));
+              }}
+            />
           </Field>
           <Field label="프롬프트" hint="기본 프롬프트를 그대로 쓰거나 직접 수정할 수 있습니다.">
             <Textarea

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Analysis, analysisDates } from "./Analysis";
@@ -96,6 +96,20 @@ describe("급식 배틀 분석 페이지", () => {
     expect(dates.at(-1)).toBe("2026-03-31");
     expect(dates).not.toContain("2026-01-31");
     expect(dates).not.toContain("2026-04-01");
+  });
+
+  it("분석 날짜를 DatePicker 입력으로 바꾼다", async () => {
+    render(<Analysis />);
+
+    const picker = screen.getByLabelText("분석 날짜");
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    expect(picker).toHaveValue(today);
+
+    const target = analysisDates().at(-1) as string;
+    fireEvent.change(picker, { target: { value: target } });
+    fireEvent.blur(picker);
+    await waitFor(() => expect(picker).toHaveValue(target));
   });
 
   it("무작위 학교 10곳을 보여주고 두 곳을 고르면 선택 결과만 남긴다", async () => {
