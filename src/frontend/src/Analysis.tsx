@@ -66,7 +66,6 @@ export function Analysis() {
   const [date, setDate] = useState(() => toIso(new Date()));
   const [step, setStep] = useState<"none" | "school" | "date" | "prompt">("school");
   const [prompt, setPrompt] = useState("");
-  const [promptEdited, setPromptEdited] = useState(false);
   const [result, setResult] = useState<AnalysisResult>();
   const [progress, setProgress] = useState<AnalysisProgress[]>([]);
   const [graph, setGraph] = useState<WorkflowGraph>();
@@ -111,7 +110,7 @@ export function Analysis() {
   }, []);
 
   useEffect(() => {
-    if (selected.length !== 2 || promptEdited) return;
+    if (selected.length !== 2) return;
     const requestId = ++promptId.current;
     void fetchAnalysisPrompt(selected[0].name, selected[1].name, date, selected[0].location ?? "", selected[1].location ?? "")
       .then(response => {
@@ -120,7 +119,7 @@ export function Analysis() {
       .catch(() => {
         if (requestId === promptId.current) setPrompt("");
       });
-  }, [selected, date, promptEdited]);
+  }, [selected, date]);
 
   const applyDate = (value: Date) => {
     setResult(undefined);
@@ -286,7 +285,6 @@ export function Analysis() {
                     resize="vertical"
                     textarea={{ rows: 10 }}
                     onChange={(_, data) => {
-                      setPromptEdited(true);
                       setPrompt(data.value);
                     }}
                   />
