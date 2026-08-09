@@ -114,6 +114,8 @@ cd src/backend
 uv run --extra dev python -m app.devui
 ```
 
+아래의 `start-local` 스크립트를 사용하면 DevUI도 함께 실행됩니다.
+
 DevUI에서는 워크플로우를 직접 실행할 수 있습니다. 입력은 다음 형태의
 JSON 문자열을 사용합니다.
 
@@ -131,8 +133,10 @@ CLI 경로를 지정합니다. Copilot CLI나 자격 증명이 없으면 결정�
 (기본값 `http://localhost:8001/mcp`)로 MCP 서버를 호출하며, MCP 서버에
 연결하지 못하면 분석 요청은 오류로 응답합니다.
 
-Docker Compose 없이 로컬에서 두 앱을 함께 실행하려면 다음 스크립트를
-사용할 수 있습니다.
+Docker Compose 없이 로컬에서 백엔드, DevUI, 프론트엔드를 함께 실행하려면
+다음 스크립트를 사용할 수 있습니다. 각각
+`http://localhost:8000`, `http://localhost:8080`,
+`http://localhost:5173`에서 뜨며 Ctrl+C로 모두 종료됩니다.
 
 ```powershell
 pwsh ./scripts/start-local.ps1

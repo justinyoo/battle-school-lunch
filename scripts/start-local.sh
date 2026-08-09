@@ -12,10 +12,12 @@ command -v npm >/dev/null 2>&1 || {
 }
 
 cleanup() {
-  if [[ -n "${BACKEND_PID:-}" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
-    kill "$BACKEND_PID" 2>/dev/null || true
-    wait "$BACKEND_PID" 2>/dev/null || true
-  fi
+  for pid in "${BACKEND_PID:-}" "${DEVUI_PID:-}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+    fi
+  done
 }
 trap cleanup EXIT INT TERM
 
@@ -23,7 +25,11 @@ cd "$ROOT"
 uv run --project "$ROOT/src/backend" python -m uvicorn app.main:app --app-dir "$ROOT/src/backend" --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
+uv run --project "$ROOT/src/backend" --extra dev python -m app.devui &
+DEVUI_PID=$!
+
 echo "Backend: http://localhost:8000"
+echo "DevUI: http://localhost:8080"
 echo "Frontend: http://localhost:5173"
-echo "Press Ctrl+C to stop both apps."
+echo "Press Ctrl+C to stop all apps."
 npm --prefix "$ROOT/src/frontend" run dev -- --host 127.0.0.1

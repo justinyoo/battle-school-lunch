@@ -8,20 +8,31 @@ if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
     throw "Node.js와 npm이 필요합니다."
 }
 
+$backendDir = Join-Path $root "src\backend"
+
 $backend = Start-Process `
     -FilePath "uv" `
     -ArgumentList "run --project src/backend python -m uvicorn app.main:app --app-dir src/backend --host 127.0.0.1 --port 8000" `
     -WorkingDirectory $root `
     -PassThru
 
+$devui = Start-Process `
+    -FilePath "uv" `
+    -ArgumentList "run --project `"$backendDir`" --extra dev python -m app.devui" `
+    -WorkingDirectory $backendDir `
+    -PassThru
+
 try {
     Write-Host "Backend: http://localhost:8000"
+    Write-Host "DevUI: http://localhost:8080"
     Write-Host "Frontend: http://localhost:5173"
-    Write-Host "Press Ctrl+C to stop both apps."
+    Write-Host "Press Ctrl+C to stop all apps."
     & npm.cmd --prefix (Join-Path $root "src\frontend") run dev -- --host 127.0.0.1
 }
 finally {
-    if ($backend -and -not $backend.HasExited) {
-        Stop-Process -Id $backend.Id -Force
+    foreach ($process in @($backend, $devui)) {
+        if ($process -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force
+        }
     }
 }
