@@ -1,22 +1,61 @@
 from contextlib import asynccontextmanager
 from datetime import date
 import logging
+import random
 import re
+import uuid
 from typing import Any
 
 import httpx
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from . import analysis
+from . import mcp_client
+from .providers import create_evaluator
+from .rubric import RUBRIC_AREAS, TOTAL_WEIGHT
+from .workflow import WORKFLOW_PATTERN, build_workflow, workflow_graph
+
+RANDOM_SCHOOL_POOL_SIZE = 10
+# 전국 17개 시도교육청 코드. 무작위 학교 풀은 특정 지역에 치우치지 않도록
+# 매번 서로 다른 교육청을 골라 균등하게 표본을 만든다.
+EDUCATION_OFFICE_CODES = (
+    "B10",  # 서울
+    "C10",  # 부산
+    "D10",  # 대구
+    "E10",  # 인천
+    "F10",  # 광주
+    "G10",  # 대전
+    "H10",  # 울산
+    "I10",  # 세종
+    "J10",  # 경기
+    "K10",  # 강원
+    "M10",  # 충북
+    "N10",  # 충남
+    "P10",  # 전북
+    "Q10",  # 전남
+    "R10",  # 경북
+    "S10",  # 경남
+    "T10",  # 제주
+)
+RANDOM_SCHOOL_OFFICE_COUNT = 5
+RANDOM_SCHOOL_PAGE_SIZE = 100
 
 
 class Settings(BaseSettings):
     neis_api_key: str = ""
     neis_base_url: str = "https://open.neis.go.kr/hub"
     cors_origins: str = "http://localhost:5173"
+    agent_provider: str = "deterministic"
+    copilot_model: str = ""
+    copilot_cli_path: str = ""
+    mcp_server_url: str = "http://localhost:8001/mcp"
+    devui_host: str = "127.0.0.1"
+    devui_port: int = 8080
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     @property
@@ -66,6 +105,19 @@ class MealResponse(BaseModel):
     items: list[Meal]
 
 
+class AnalysisSchool(BaseModel):
+    education_office_code: str = Field(alias="educationOfficeCode")
+    school_code: str = Field(alias="schoolCode")
+    name: str
+
+
+class AnalysisRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+    schools: list[AnalysisSchool]
+    date: str
+    prompt: str = ""
+
+
 def _rows(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
     section = payload.get(key, [])
     if not isinstance(section, list):
@@ -75,6 +127,26 @@ def _rows(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
         if isinstance(entry, dict) and isinstance(entry.get("row"), list):
             result.extend(row for row in entry["row"] if isinstance(row, dict))
     return result
+
+
+def _last_page(payload: dict[str, Any], page_size: int) -> int:
+    """`schoolInfo` head의 전체 건수로 마지막 페이지 번호를 계산한다."""
+
+    section = payload.get("schoolInfo", [])
+    if not isinstance(section, list):
+        return 1
+    for entry in section:
+        if not isinstance(entry, dict) or not isinstance(entry.get("head"), list):
+            continue
+        for item in entry["head"]:
+            if not isinstance(item, dict) or "list_total_count" not in item:
+                continue
+            try:
+                total = int(item["list_total_count"])
+            except (TypeError, ValueError):
+                return 1
+            return max(1, -(-total // page_size))
+    return 1
 
 
 def normalize_schools(payload: dict[str, Any]) -> list[School]:
@@ -202,7 +274,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="School Lunch API", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_methods=["GET", "POST"], allow_headers=["*"])
 
 
 @app.exception_handler(ApiError)
@@ -251,3 +323,175 @@ async def meals(
     rows = _rows(payload, "mealServiceDietInfo")
     school_name = next((str(row.get("SCHUL_NM")) for row in rows if row.get("SCHUL_NM")), "")
     return MealResponse(school=SchoolSummary(educationOfficeCode=education_office_code, schoolCode=school_code, name=school_name), items=sorted(normalize_meals(payload), key=lambda item: item.date))
+
+
+def _evaluator():
+    return create_evaluator(settings.agent_provider, settings.copilot_model, settings.copilot_cli_path)
+
+
+async def _load_meals(education_office_code: str, school_code: str, target_date: str) -> dict[str, Any]:
+    """분석 화면은 내부 NEIS 호출 대신 MCP 서버의 도구를 통해 급식을 조회한다."""
+
+    try:
+        return await mcp_client.load_lunch_meals(
+            settings.mcp_server_url,
+            education_office_code,
+            school_code,
+            target_date,
+        )
+    except mcp_client.McpUnavailableError as error:
+        raise ApiError("MCP_UNAVAILABLE", "급식 MCP 서버를 사용할 수 없습니다.", 502) from error
+
+
+def _validate_analysis_date(value: str) -> str:
+    if not re.fullmatch(r"\d{8}", value):
+        raise ApiError("INVALID_DATE", "날짜 형식이 올바르지 않습니다.", 400)
+    try:
+        parsed = date.fromisoformat(f"{value[:4]}-{value[4:6]}-{value[6:]}")
+    except ValueError as exc:
+        raise ApiError("INVALID_DATE", "날짜 형식이 올바르지 않습니다.", 400) from exc
+    today = date.today()
+    this_month = (today.year, today.month)
+    previous_month = (today.year - 1, 12) if today.month == 1 else (today.year, today.month - 1)
+    if (parsed.year, parsed.month) not in (this_month, previous_month):
+        raise ApiError("INVALID_ANALYSIS_DATE", "이번 달 또는 직전 달의 날짜만 분석할 수 있습니다.", 400)
+    return value
+
+
+def _validate_analysis_schools(schools: list[AnalysisSchool]) -> list[dict[str, str]]:
+    if len(schools) != 2:
+        raise ApiError("INVALID_SCHOOL_SELECTION", "학교를 정확히 두 곳 선택해 주세요.", 400)
+    codes = {(item.education_office_code, item.school_code) for item in schools}
+    if len(codes) != 2:
+        raise ApiError("INVALID_SCHOOL_SELECTION", "서로 다른 학교 두 곳을 선택해 주세요.", 400)
+    for item in schools:
+        validate_code(item.education_office_code, "education_office_code")
+        validate_code(item.school_code, "school_code")
+    return [
+        {
+            "educationOfficeCode": item.education_office_code,
+            "schoolCode": item.school_code,
+            "name": item.name.strip() or item.school_code,
+        }
+        for item in schools
+    ]
+
+
+@app.get("/api/schools/random", response_model=SchoolResponse)
+async def random_schools() -> SchoolResponse:
+    """전국 시도교육청에서 균등하게 표본을 뽑아 무작위 학교 풀을 만든다."""
+
+    offices = random.sample(EDUCATION_OFFICE_CODES, RANDOM_SCHOOL_OFFICE_COUNT)
+    per_office = -(-RANDOM_SCHOOL_POOL_SIZE // RANDOM_SCHOOL_OFFICE_COUNT)
+    collected: dict[tuple[str, str], School] = {}
+    for office in offices:
+        params = {"ATPT_OFCDC_SC_CODE": office, "pSize": str(RANDOM_SCHOOL_PAGE_SIZE)}
+        try:
+            payload = await fetch_neis("/schoolInfo", params)
+            # 이름순 첫 페이지에 쏠리지 않도록 전체 건수 안에서 임의 페이지를 다시 읽는다.
+            last_page = _last_page(payload, RANDOM_SCHOOL_PAGE_SIZE)
+            if last_page > 1:
+                params["pIndex"] = str(random.randint(1, last_page))
+                payload = await fetch_neis("/schoolInfo", params)
+        except ApiError:
+            # 일부 교육청 조회가 실패해도 나머지 지역으로 풀을 구성한다.
+            continue
+        candidates = normalize_schools(payload)
+        if not candidates:
+            continue
+        for item in random.sample(candidates, min(per_office, len(candidates))):
+            collected[(item.education_office_code, item.school_code)] = item
+    pool = list(collected.values())
+    if not pool:
+        return SchoolResponse(items=[])
+    sample_size = min(RANDOM_SCHOOL_POOL_SIZE, len(pool))
+    return SchoolResponse(items=random.sample(pool, sample_size))
+
+
+@app.get("/api/analysis/rubric")
+async def analysis_rubric() -> dict[str, Any]:
+    return {
+        "totalWeight": TOTAL_WEIGHT,
+        "pattern": WORKFLOW_PATTERN,
+        "provider": settings.agent_provider,
+        "areas": [
+            {
+                "id": area.id,
+                "agentName": area.agent_name,
+                "title": area.title,
+                "weight": area.weight,
+                "purpose": area.purpose,
+                "checkpoints": list(area.checkpoints),
+                "scale": list(area.scale),
+            }
+            for area in RUBRIC_AREAS
+        ],
+    }
+
+
+@app.get("/api/analysis/workflow")
+async def analysis_workflow() -> dict[str, Any]:
+    return workflow_graph()
+
+
+@app.get("/api/analysis/prompt")
+async def analysis_prompt(
+    first: str = Query(min_length=1, max_length=50),
+    second: str = Query(min_length=1, max_length=50),
+    target_date: str = Query(alias="date", pattern=r"^\d{8}$"),
+    first_location: str = Query("", alias="firstLocation", max_length=50),
+    second_location: str = Query("", alias="secondLocation", max_length=50),
+) -> dict[str, str]:
+    _validate_analysis_date(target_date)
+    return {
+        "prompt": analysis.build_prompt(
+            first.strip(),
+            second.strip(),
+            target_date,
+            first_location.strip(),
+            second_location.strip(),
+        )
+    }
+
+
+@app.post("/api/analysis")
+async def analysis_run(request: AnalysisRequest) -> dict[str, Any]:
+    schools = _validate_analysis_schools(request.schools)
+    target_date = _validate_analysis_date(request.date)
+    prompt = request.prompt.strip() or analysis.build_prompt(schools[0]["name"], schools[1]["name"], target_date)
+    return await analysis.analyze_battle(_evaluator(), _load_meals, schools, target_date, prompt)
+
+
+@app.post("/api/analysis/agui")
+async def analysis_agui(request: AnalysisRequest) -> StreamingResponse:
+    schools = _validate_analysis_schools(request.schools)
+    target_date = _validate_analysis_date(request.date)
+    prompt = request.prompt.strip() or analysis.build_prompt(schools[0]["name"], schools[1]["name"], target_date)
+    stream = analysis.stream_agui_events(
+        _evaluator(),
+        _load_meals,
+        schools,
+        target_date,
+        prompt,
+        thread_id=uuid.uuid4().hex,
+        run_id=uuid.uuid4().hex,
+    )
+    return StreamingResponse(stream, media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+def run_devui() -> None:
+    """Agent Framework 공식 DevUI를 기본값대로 독립 서버로 실행한다.
+
+    DevUI 프론트엔드는 API를 오리진 루트 기준 절대 경로로 호출하므로
+    다른 앱의 하위 경로에 마운트할 수 없다. 따라서 별도 포트에서 실행한다.
+    """
+
+    from agent_framework.devui import serve
+
+    serve(
+        entities=[build_workflow(_evaluator())],
+        host=settings.devui_host,
+        port=settings.devui_port,
+        ui_enabled=True,
+        auth_enabled=False,
+    )

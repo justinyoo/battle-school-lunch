@@ -12,9 +12,24 @@ command -v npm >/dev/null 2>&1 || {
 }
 
 cleanup() {
-  if [[ -n "${BACKEND_PID:-}" ]] && kill -0 "$BACKEND_PID" 2>/dev/null; then
-    kill "$BACKEND_PID" 2>/dev/null || true
-    wait "$BACKEND_PID" 2>/dev/null || true
+  for pid in "${BACKEND_PID:-}" "${DEVUI_PID:-}" "${MCP_PID:-}"; do
+    if [[ -n "$pid" ]]; then
+      stop_process_tree "$pid"
+    fi
+  done
+}
+
+stop_process_tree() {
+  local root_pid="$1"
+  local child_pid
+
+  while read -r child_pid; do
+    [[ -n "$child_pid" ]] && stop_process_tree "$child_pid"
+  done < <(pgrep -P "$root_pid" 2>/dev/null || true)
+
+  if kill -0 "$root_pid" 2>/dev/null; then
+    kill "$root_pid" 2>/dev/null || true
+    wait "$root_pid" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT INT TERM
@@ -23,7 +38,17 @@ cd "$ROOT"
 uv run --project "$ROOT/src/backend" python -m uvicorn app.main:app --app-dir "$ROOT/src/backend" --host 127.0.0.1 --port 8000 &
 BACKEND_PID=$!
 
+uv run --project "$ROOT/src/backend" --extra dev python -c \
+  'from app.main import run_devui; run_devui()' &
+DEVUI_PID=$!
+
+MCP_TRANSPORT=streamable-http uv run --project "$ROOT/src/mcp" --extra dev \
+  python -m school_lunch_mcp.server &
+MCP_PID=$!
+
 echo "Backend: http://localhost:8000"
+echo "MCP: http://localhost:8001/mcp"
+echo "DevUI: http://localhost:8080"
 echo "Frontend: http://localhost:5173"
-echo "Press Ctrl+C to stop both apps."
+echo "Press Ctrl+C to stop all apps."
 npm --prefix "$ROOT/src/frontend" run dev -- --host 127.0.0.1

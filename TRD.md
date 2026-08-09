@@ -25,7 +25,7 @@ NEIS Open API
     v
 Python 백엔드 -> 정규화된 JSON -> React 프론트엔드
 
-MCP 클라이언트
+MCP 클라이언트 또는 급식 배틀 분석 백엔드
     |  Streamable HTTP 또는 stdio
     v
 Python MCP 서버 -> 정규화된 JSON -> NEIS Open API
@@ -76,6 +76,14 @@ Python MCP 서버 -> 정규화된 JSON -> NEIS Open API
 - `src/mcp`가 설정, NEIS 요청, 입력 검증 및 정규화를 독립적으로 소유한다.
   입력 및 upstream 오류는 민감한 원문을 포함하지 않는 MCP 도구 오류로
   반환하며, 검색·급식 결과 없음은 빈 `items`와 명확한 메시지로 반환한다.
+- 급식 배틀 분석은 백엔드 내부 NEIS 호출 대신 이 MCP 서버의
+  `get_lunch_meals` 도구를 Streamable HTTP로 호출해 급식 정보를 가져온다.
+  백엔드는 `MCP_SERVER_URL` 설정으로 대상 서버를 지정하며, 연결이나 도구
+  호출이 실패하면 `MCP_UNAVAILABLE` 코드의 502 오류로 응답한다. 급식 메뉴
+  조회 화면은 기존 `/api/meals` 내부 API 경로를 그대로 사용한다.
+- 백엔드의 MCP 클라이언트 의존성은 Agent Framework가 요구하는 범위에 맞춰
+  `mcp>=1.24,<2`로 고정한다. MCP SDK 2.x는 Agent Framework가 지원하지
+  않으므로 사용하지 않는다.
 
 ## 3. 내부 API 설계
 
@@ -158,6 +166,84 @@ FastAPI가 생성하는 누락·형식·길이 검증 오류도 기본 `detail` 
 400과 동일한 `error.code`, `error.message` 봉투로 변환한다. 프론트엔드는
 이 봉투가 유효할 때만 서버 메시지를 표시하고 그 외 응답에는 일반 오류
 문구를 사용한다.
+
+### 3.4 급식 배틀 분석 API
+
+멀티 에이전트 분석은 기존 백엔드 앱에 통합된다. 별도 서비스를 추가하지
+않고 `/api/analysis` 하위 경로만 늘린다. DevUI는 백엔드 앱에 마운트하지
+않고 별도 프로세스로 실행한다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/api/schools/random` | 전국 후보 학교 최대 10곳을 무작위로 반환 |
+| GET | `/api/analysis/rubric` | 평가 영역, 가중치, 5점 척도 |
+| GET | `/api/analysis/workflow` | 워크플로우 노드와 엣지 그래프 |
+| GET | `/api/analysis/prompt` | 두 학교와 날짜로 만든 기본 프롬프트 |
+| POST | `/api/analysis` | 배틀 분석 결과 |
+| POST | `/api/analysis/agui` | AG-UI 프로토콜 SSE 스트림 |
+
+입력 경계에서 학교가 정확히 두 곳인지, 서로 다른 학교인지, 날짜가 이번 달
+또는 직전 달인지 확인한다. 위반 시 각각 `INVALID_SCHOOL_SELECTION`,
+`INVALID_ANALYSIS_DATE` 코드로 400을 반환한다.
+
+`/api/schools/random`은 전국 17개 시도교육청 코드 중 다섯 곳을 무작위로
+고른 뒤, 각 교육청의 전체 건수를 확인해 임의 페이지에서 표본을 뽑는다.
+이름순 첫 페이지나 특정 지역에 결과가 쏠리지 않게 하기 위한 것이며, 일부
+교육청 조회가 실패해도 나머지 지역으로 풀을 구성한다.
+
+### 3.5 멀티 에이전트 워크플로우
+
+Microsoft Agent Framework의 `WorkflowBuilder`로 concurrent fan-out,
+sequential fan-in 구조를 구성한다.
+
+1. `prepare-meal-facts`가 급식 응답을 평가용 사실 집합으로 정규화한다.
+2. `add_fan_out_edges`로 네 영역 에이전트를 동시에 실행한다.
+   `nutrition-health-agent`(35점), `ingredient-safety-agent`(25점),
+   `menu-variety-preference-agent`(25점), `sustainability-value-agent`(15점).
+3. `add_fan_in_edges`로 `final-synthesis-agent`가 결과를 모아 가중 총점과
+   총평을 만든다.
+4. 두 학교의 총점을 비교해 승자·패자 또는 동점을 판정한다.
+
+영역별 점수는 5점 척도이며 `점수 / 5 × 가중치`로 환산한다. 가중치 합은
+항상 100이다. 근거가 없는 항목은 추정하지 않고 확인 불가로 남긴다.
+
+`AGENT_PROVIDER=copilot`이면 Microsoft Agent Framework의
+`GitHubCopilotAgent`(GitHub Copilot SDK)로 채점하고, 그렇지 않으면
+외부 호출 없는 결정적 평가자로 동작한다. `COPILOT_MODEL`,
+`COPILOT_CLI_PATH`로 모델과 Copilot CLI 경로를 지정할 수 있다. 테스트와
+E2E는 결정적 평가자를 사용해 외부 서비스에 의존하지 않는다.
+
+### 3.6 AG-UI 이벤트 경계
+
+`/api/analysis/agui`는 `text/event-stream`으로 `RUN_STARTED`,
+`CUSTOM(workflow.graph)`, 학교별 `STEP_STARTED`,
+`CUSTOM(workflow.area)`, `CUSTOM(workflow.school)`, `STEP_FINISHED`,
+`CUSTOM(workflow.battle)`, `TEXT_MESSAGE_START|CONTENT|END`,
+`RUN_FINISHED` 순으로 이벤트를 보낸다. 실패 시 상세 원인 대신
+`RUN_ERROR`와 일반화된 메시지만 전달한다. nginx 프록시에서는 이 경로의
+버퍼링을 끈다.
+
+프론트엔드 분석 화면은 이 이벤트를 구독해 결과 영역 아래의 워크플로우
+그래프를 갱신한다. `STEP_STARTED`는 영역 노드를 실행 중으로,
+`CUSTOM(workflow.area)`는 해당 영역 노드를 점수와 함께 완료로,
+`CUSTOM(workflow.school)`은 종합 노드를 완료로 바꾼다.
+
+### 3.7 Agent Framework 공식 DevUI
+
+워크플로우 디버깅에는 자체 화면 대신 `agent-framework-devui`를 기본 동작
+그대로 사용한다. DevUI 프론트엔드 번들이 `/meta`, `/v1/entities` 같은
+오리진 루트 기준 절대 경로를 호출하므로 다른 앱의 하위 경로에 마운트할 수
+없다. 따라서 백엔드 API에 마운트하지 않고 `serve()`로 별도 프로세스에서
+실행하며, 기본 주소는 `http://127.0.0.1:8080`이다. 호스트와 포트는
+`DEVUI_HOST`, `DEVUI_PORT`로 조정한다. DevUI 프로세스도 루트 `.env`를
+읽어 `AGENT_PROVIDER=copilot` 설정을 적용할 수 있다. DevUI는 `dev` extra에
+속하므로 운영 이미지에서는 실행하지 않는다.
+
+DevUI는 시작 노드에 문자열이나 매핑을 전달하므로 `prepare-meal-facts`는
+`EvaluationRequest` 외에 JSON 문자열, 날짜가 포함된 자연어 문자열, 딕셔너리
+입력을 받는다. 자연어 입력은 메뉴 원문이 없어 미확인 정보가 포함된 결과를
+생성한다. 날짜를 식별할 수 없는 입력과 그 밖의 잘못된 입력은 `ValueError`로
+거부하고 내부 정보를 노출하지 않는다.
 
 ## 4. 데이터 흐름
 
@@ -268,10 +354,13 @@ Playwright에서 가로채지 않으며, FastAPI의 `NEIS_BASE_URL`만 표준 �
 3. 시작일과 종료일을 선택한다.
 4. 조회를 실행한다.
 5. 날짜별 중식 메뉴를 확인한다.
+6. 분석 화면에서 두 학교와 날짜·프롬프트를 입력하고 비교 분석을 실행한다.
+7. 두 학교별 결과와 학교별 워크플로우 상태·점수를 확인한다.
 
-검색 결과 없음, 잘못된 날짜 범위, 급식 정보 없음 및 서버 오류에 대한
-사용자 안내도 E2E 시나리오로 포함한다. E2E 환경의 외부 NEIS 호출은
-결정적인 테스트를 위해 테스트 서버나 모킹 계층으로 대체한다.
+검색 결과 없음, 잘못된 날짜 범위, 급식 정보 없음, 분석 오류 및 서버 오류에
+대한 사용자 안내도 E2E 시나리오로 포함한다. MCP 라우팅과 독립 DevUI 노출은
+고정된 로컬 설정으로 검증한다. E2E 환경의 외부 NEIS 호출은 결정적인 테스트를
+위해 테스트 서버나 모킹 계층으로 대체한다.
 
 ## 7. 보안 및 운영 고려사항
 

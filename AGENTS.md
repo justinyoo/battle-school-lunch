@@ -47,6 +47,14 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 브라�
   제공하며, 백엔드 앱과 독립된 NEIS 검증·정규화 로직을 사용합니다. MCP
   도구 오류에도 인증키, 외부 응답 원문 또는 내부 요청 정보를 포함하지
   않습니다.
+- 급식 배틀 분석은 백엔드가 `MCP_SERVER_URL`의 MCP 서버를 Streamable HTTP로
+  호출해 `get_lunch_meals`로 급식을 조회합니다. MCP 서버를 사용할 수 없으면
+  `MCP_UNAVAILABLE` 502 오류로 응답하며, 급식 메뉴 조회 화면은 기존
+  `/api/meals` 경로를 그대로 사용합니다. 백엔드의 MCP 클라이언트 의존성은
+  Agent Framework 호환 범위인 `mcp>=1.24,<2`를 유지합니다.
+- 분석 워크플로우는 두 학교의 진행 상태와 영역 점수를 학교별로 분리해
+  시각화하며, DevUI 입력은 JSON 또는 날짜가 포함된 자연어를 지원합니다.
+  메뉴 원문이 없는 자연어 입력은 미확인 정보 경고를 포함할 수 있습니다.
 - 프론트엔드는 API 응답을 사용하기 전에 런타임 타입 검증을 수행합니다.
   학교명 trim 후 두 글자 이상에서 350ms 디바운스 검색을 사용하며,
   검색·급식 조회의 오래된 응답이 최신 상태를 덮어쓰지 않도록 요청 ID를
@@ -58,7 +66,9 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 브라�
 
 - 백엔드와 MCP 서버 설정은 각각 `pydantic-settings`로 `.env` 및 환경
   변수에서 읽습니다. 주요 변수는 `NEIS_API_KEY`, `NEIS_BASE_URL`,
-  `CORS_ORIGINS`, `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`입니다.
+  `CORS_ORIGINS`, `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`,
+  `MCP_SERVER_URL`, `AGENT_PROVIDER`, `COPILOT_MODEL`,
+  `COPILOT_CLI_PATH`, `DEVUI_HOST`, `DEVUI_PORT`입니다.
 - `.env.example`을 참고해 로컬 `.env`를 만들고, 비밀 값·자격 증명·로컬
   환경 파일은 커밋하지 않습니다.
 - NEIS 인증키는 백엔드와 MCP 서버에만 전달하며 코드, 프론트엔드 번들, 로그,
@@ -99,7 +109,9 @@ docker compose up --build
 `http://localhost:8000`, MCP 서버는
 `http://localhost:8001/mcp`, 백엔드 상태 확인은 `/health`입니다. Docker 없이
 로컬 개발을 할 때는 `pwsh ./scripts/start-local.ps1` 또는
-`bash ./scripts/start-local.sh`를 사용합니다.
+`bash ./scripts/start-local.sh`를 사용합니다. 이 스크립트는 백엔드,
+MCP 서버(`http://localhost:8001/mcp`), Agent Framework
+DevUI(`http://localhost:8080`), 프론트엔드를 함께 실행합니다.
 
 ## 테스트와 검증
 
@@ -116,13 +128,14 @@ docker compose up --build
 
 프론트엔드 통합 테스트는 학교 검색·선택, 날짜 범위, 중식 결과, 빈 결과,
 로딩·오류, 잘못된 날짜 범위, 오래된 응답 무시를 검증합니다. 백엔드
-테스트는 입력 검증, NEIS 응답 정규화, 중식 필터링, 빈 응답, 오류 매핑을
+테스트는 입력 검증, NEIS 응답 정규화, 중식 필터링, 빈 응답, 오류 매핑,
+멀티 에이전트 fan-out/fan-in, 자연어 DevUI 입력, 학교별 워크플로우 시각화를
 검증하며 외부 네트워크에 의존하지 않습니다.
 
 E2E는 Playwright가 Vite와 FastAPI를 실행하고 `src/e2e/support/mock_neis.py`
 를 `NEIS_BASE_URL`로 연결해 실제 브라우저-프론트엔드-백엔드 경계를
-검증합니다. 테스트에서 외부 NEIS 서비스에 접근하거나 브라우저 요청을
-임의로 가로채지 않습니다.
+검증합니다. 분석·DevUI 노출과 MCP 라우팅도 E2E 범위에 포함하며, 테스트에서
+외부 NEIS 서비스에 접근하거나 브라우저 요청을 임의로 가로채지 않습니다.
 
 ## 문서화
 

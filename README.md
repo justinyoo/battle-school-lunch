@@ -7,8 +7,19 @@ NEIS 공개 API를 활용한 초중고 급식 메뉴 조회 및 분석 웹 애�
 - 학교 이름의 일부로 학교를 검색합니다.
 - 학교와 조회할 날짜 범위를 선택합니다.
 - 날짜별 중식 메뉴와 조회 결과 없음 또는 API 오류 상태를 표시합니다.
+- 무작위 학교 10곳 중 두 곳을 골라 중식을 비교 평가하는 급식 배틀 분석
+  화면을 제공합니다.
+- `EVALUATION_RUBRIC.md`의 4개 영역을 concurrent fan-out, sequential
+  fan-in 멀티 에이전트 워크플로우로 채점하고 승자·패자·동점을 판정합니다.
+- 분석 화면 하단에서 워크플로우 그래프와 각 에이전트의 실행 상태를
+  단계별로 시각화합니다.
+- Agent Framework 공식 DevUI를 별도 프로세스로 실행해 워크플로우를
+  직접 실행하고 디버깅할 수 있습니다.
 - 브라우저에서 NEIS API를 직접 호출하지 않고 Python API를 통해 연동합니다.
 - 공식 MCP SDK 1.x 기반 MCP 서버에서 학교·중식 조회 도구를 제공합니다.
+- 급식 배틀 분석 화면은 급식 정보를 MCP 서버의 `get_lunch_meals` 도구로
+  조회하므로 분석을 사용하려면 MCP 서버가 함께 실행되어야 합니다.
+  급식 메뉴 조회 화면은 기존 내부 API를 그대로 사용합니다.
 - React 프론트엔드와 Python 백엔드를 Docker Compose로 함께 실행합니다.
 
 ## 아키텍처
@@ -17,7 +28,7 @@ NEIS 공개 API를 활용한 초중고 급식 메뉴 조회 및 분석 웹 애�
 | --- | --- | --- |
 | 프론트엔드 | React 및 TypeScript | 학교 검색, 날짜 선택 및 급식 메뉴 표시 |
 | 백엔드 | Python | NEIS API 연동, 입력값 검증 및 응답 데이터 구성 |
-| MCP 서버 | Python, MCP SDK 1.x | 독립 실행되는 에이전트용 학교 검색·중식 조회 도구 |
+| MCP 서버 | Python, MCP SDK 1.x | 에이전트와 분석 백엔드가 사용하는 학교 검색·중식 조회 도구 |
 | 실행 환경 | Docker Compose | 프론트엔드와 백엔드의 로컬 오케스트레이션 |
 
 예정된 소스 디렉터리 구조는 다음과 같습니다.
@@ -66,11 +77,69 @@ docker compose up --build
 ```
 
 브라우저는 `http://localhost:5173`, API는 `http://localhost:8000`에서
-접속합니다. MCP 서버는 `http://localhost:8001/mcp`에서 Streamable HTTP
+접속합니다. 급식 배틀 분석 화면은 `http://localhost:5173/#/analysis`,
+MCP 서버는 `http://localhost:8001/mcp`에서 Streamable HTTP
 전송을 제공합니다. `.env.example`을 `.env`로 복사하고 NEIS API 키를 설정하세요.
 
-Docker Compose 없이 로컬에서 두 앱을 함께 실행하려면 다음 스크립트를
-사용할 수 있습니다.
+## 멀티 에이전트 급식 배틀 분석
+
+분석 화면은 전국 무작위 학교 10곳을 제시하고 그중 정확히 두 곳과 이번 달
+또는 직전 달의 날짜 하나를 선택하도록 합니다. 후보 풀은 전국 17개
+시도교육청 중 다섯 곳을 무작위로 고르고 각 교육청의 임의 페이지에서
+표본을 뽑아 특정 지역에 치우치지 않게 구성합니다. 기본 프롬프트는 자동으로
+생성되며 실행 전에 자유롭게 수정할 수 있습니다.
+
+백엔드는 `EVALUATION_RUBRIC.md`의 네 영역을 담당하는 에이전트를 동시에
+실행하고(concurrent fan-out), 결과를 하나의 종합 에이전트로 모아
+가중 총점과 총평을 만듭니다(sequential fan-in). 진행 상황과 결과는 AG-UI
+프로토콜 SSE 이벤트로 전달되며, 분석 화면 하단의 워크플로우 그래프가 각
+에이전트의 대기·실행 중·완료 상태와 영역 점수를 실시간으로 보여줍니다.
+
+| 엔드포인트 | 설명 |
+| --- | --- |
+| `GET /api/schools/random` | 전국 무작위 후보 학교 최대 10곳 |
+| `GET /api/analysis/rubric` | 평가 영역, 가중치, 척도 |
+| `GET /api/analysis/workflow` | 워크플로우 그래프(노드·엣지) |
+| `GET /api/analysis/prompt` | 두 학교와 날짜로 만든 기본 프롬프트 |
+| `POST /api/analysis` | 배틀 분석 결과를 한 번에 반환 |
+| `POST /api/analysis/agui` | AG-UI 프로토콜 SSE 이벤트 스트림 |
+
+Agent Framework 공식 DevUI는 백엔드 API와 분리된 별도 프로세스로
+실행합니다. `dev` extra가 설치된 개발 환경에서 다음 명령으로 띄우고
+`http://localhost:8080`에서 접속합니다. 호스트와 포트는 `DEVUI_HOST`,
+`DEVUI_PORT`로 바꿀 수 있습니다.
+
+```sh
+uv run --project src/backend --extra dev python -c 'from app.main import run_devui; run_devui()'
+```
+
+아래의 `start-local` 스크립트를 사용하면 MCP 서버와 DevUI도 함께 실행됩니다.
+
+DevUI에서는 워크플로우를 직접 실행할 수 있습니다. 메뉴 근거까지 지정하려면
+다음 JSON 문자열을 사용하고, 날짜가 포함된 자연어 요청도 실행할 수
+있습니다. 자연어 입력은 현재 첫 번째 학교명과 날짜를 파싱하며 두 학교의
+메뉴 원문을 자동으로 구성하지 않으므로 결과에 미확인 정보가 표시될 수
+있습니다. 두 학교의 완전한 비교는 분석 화면을 사용합니다.
+
+```json
+{"schoolName": "예시고", "date": "20260601", "facts": {"menu": ["백미밥", "미역국"]}}
+```
+
+기본값인 `AGENT_PROVIDER=deterministic`은 외부 모델 없이 규칙 기반으로
+채점합니다. GitHub Copilot SDK를 사용하려면 `AGENT_PROVIDER=copilot`을
+설정하고, 필요에 따라 `COPILOT_MODEL`, `COPILOT_CLI_PATH`로 모델과 Copilot
+CLI 경로를 지정합니다. Copilot CLI나 자격 증명이 없으면 결정적 평가로 자동
+전환됩니다.
+
+분석 화면의 급식 조회는 MCP 서버를 경유합니다. 백엔드는 `MCP_SERVER_URL`
+(기본값 `http://localhost:8001/mcp`)로 MCP 서버를 호출하며, MCP 서버에
+연결하지 못하면 분석 요청은 오류로 응답합니다.
+
+Docker Compose 없이 로컬에서 백엔드, MCP 서버, DevUI, 프론트엔드를 함께 실행하려면
+다음 스크립트를 사용할 수 있습니다. 각각
+`http://localhost:8000`, `http://localhost:8001/mcp`,
+`http://localhost:8080`, `http://localhost:5173`에서 뜨며 Ctrl+C로 모두
+종료됩니다.
 
 ```powershell
 pwsh ./scripts/start-local.ps1

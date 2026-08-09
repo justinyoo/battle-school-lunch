@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Button, Card, Field, FluentProvider, Input, MessageBar, Spinner, Text, Title1, makeStyles, tokens, webLightTheme } from "@fluentui/react-components";
 import { DatePicker } from "@fluentui/react-datepicker-compat";
 import { fetchMeals, Meal, School, searchSchools } from "./api";
+import { Analysis } from "./Analysis";
 import "./styles.css";
 
 const useStyles = makeStyles({
@@ -54,6 +55,12 @@ const datesInRange = (from: string, to: string) => {
 
 export function App() {
   const styles = useStyles();
+  const [route, setRoute] = useState(() => (typeof window === "undefined" ? "" : window.location.hash));
+  useEffect(() => {
+    const onHashChange = () => setRoute(window.location.hash);
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
   const [name, setName] = useState(""); const [schools, setSchools] = useState<School[]>([]); const [school, setSchool] = useState<School>();
   const [from, setFrom] = useState(localToday); const [to, setTo] = useState(localToday); const [meals, setMeals] = useState<Meal[]>([]);
   const [searching, setSearching] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [searched, setSearched] = useState(false); const [queried, setQueried] = useState(false);
@@ -127,7 +134,15 @@ export function App() {
   };
   const mealsByDate = new Map(meals.map(meal => [meal.date, meal]));
   const resultDates = queried ? datesInRange(from, to) : [];
+  const nav = <nav aria-label="페이지 이동" className="inline">
+    <Button appearance={route === "#/analysis" ? "secondary" : "primary"} onClick={() => { window.location.hash = ""; setRoute(""); }}>급식 메뉴</Button>
+    <Button appearance={route === "#/analysis" ? "primary" : "secondary"} onClick={() => { window.location.hash = "#/analysis"; setRoute("#/analysis"); }}>급식 배틀 분석</Button>
+  </nav>;
+  if (route === "#/analysis") {
+    return <FluentProvider theme={webLightTheme}><main className={styles.app}><div className={styles.content}>{nav}<Analysis /></div></main></FluentProvider>;
+  }
   return <FluentProvider theme={webLightTheme}><main className={styles.app}><div className={styles.content}>
+    {nav}
     <header className={styles.header}><Title1>급식 배틀</Title1><Text size={400}>학교를 검색하고 날짜별 중식 메뉴를 확인하세요.</Text></header>
     {error && <MessageBar intent="error" role="alert">{error}</MessageBar>}
     <Field label="학교 이름" hint="두 글자 이상 입력하면 검색 결과가 자동으로 표시됩니다."><div className="inline"><Input value={name} onChange={(_, d) => { setName(d.value); if (school) { setSchool(undefined); resetMealQuery(); } }} onKeyDown={e => e.key === "Enter" && void search()} placeholder="예: 서울고" /></div></Field>

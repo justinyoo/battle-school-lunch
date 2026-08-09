@@ -1,10 +1,14 @@
 services:
   backend:
     build: ./src/backend
+    environment:
+      MCP_SERVER_URL: http://mcp:8001/mcp
     env_file:
       - path: .env
         required: false
     ports: ["8000:8000"]
+    depends_on:
+      - mcp
     healthcheck: { test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"], interval: 10s, timeout: 3s, retries: 5 }
   mcp:
     build: ./src/mcp

@@ -49,6 +49,22 @@ uv run --extra dev pytest
 docker compose up --build
 ```
 
+로컬에서 백엔드, MCP 서버, Agent Framework 공식 DevUI, 프론트엔드를 함께
+실행하려면 다음 스크립트를 사용합니다. 실행 중 Ctrl+C를 한 번 누르면
+하위 프로세스를 포함해 모두 종료됩니다.
+
+```powershell
+pwsh ./scripts/start-local.ps1
+```
+
+```bash
+bash ./scripts/start-local.sh
+```
+
+DevUI는 `http://localhost:8080`, MCP 서버는
+`http://localhost:8001/mcp`에서 제공됩니다. Copilot SDK 평가를 사용하려면
+루트 `.env`에 `AGENT_PROVIDER=copilot`과 필요한 Copilot 설정을 지정합니다.
+
 프론트엔드, 백엔드 및 MCP 테스트를 한 번에 실행:
 
 ```powershell
@@ -59,7 +75,8 @@ pwsh ./scripts/test-all.ps1
 bash ./scripts/test-all.sh
 ```
 
-E2E 테스트만 실행하려면 `src/e2e`에서 `npm test`를 실행합니다.
+E2E 테스트만 실행하려면 `src/e2e`에서 `npm test`를 실행합니다. E2E는 일반
+급식 조회, 급식 배틀 분석, MCP 라우팅 및 DevUI 워크플로우 노출을 검증합니다.
 
 ## Pull Request 절차
 
