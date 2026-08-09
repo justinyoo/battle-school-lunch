@@ -11,6 +11,30 @@ if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
 $backendDir = Join-Path $root "src\backend"
 $mcpDir = Join-Path $root "src\mcp"
 
+function Stop-ProcessTree([int]$rootId) {
+    $ids = [System.Collections.Generic.List[int]]::new()
+    $queue = [System.Collections.Generic.Queue[int]]::new()
+    $queue.Enqueue($rootId)
+
+    while ($queue.Count -gt 0) {
+        $parentId = $queue.Dequeue()
+        if ($ids.Contains($parentId)) {
+            continue
+        }
+        $ids.Add($parentId)
+        $children = @(Get-CimInstance Win32_Process `
+            -Filter "ParentProcessId = $parentId" `
+            -ErrorAction SilentlyContinue)
+        foreach ($child in $children) {
+            $queue.Enqueue([int]$child.ProcessId)
+        }
+    }
+
+    foreach ($id in ($ids | Sort-Object -Descending)) {
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    }
+}
+
 $backend = Start-Process `
     -FilePath "uv" `
     -ArgumentList "run --project src/backend python -m uvicorn app.main:app --app-dir src/backend --host 127.0.0.1 --port 8000" `
@@ -40,8 +64,8 @@ try {
 }
 finally {
     foreach ($process in @($backend, $devui, $mcp)) {
-        if ($process -and -not $process.HasExited) {
-            Stop-Process -Id $process.Id -Force
+        if ($process) {
+            Stop-ProcessTree $process.Id
         }
     }
 }
