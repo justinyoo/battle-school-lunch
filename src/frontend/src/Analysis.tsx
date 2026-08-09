@@ -64,7 +64,7 @@ export function Analysis() {
   const [maxDate] = useState(() => toDate(dates[dates.length - 1]));
   const isAllowed = (value: Date) => dates.includes(toIso(value));
   const [date, setDate] = useState(() => toIso(new Date()));
-  const [step, setStep] = useState<"none" | "date" | "prompt">("none");
+  const [step, setStep] = useState<"none" | "school" | "date" | "prompt">("school");
   const [dateConfirmed, setDateConfirmed] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [promptEdited, setPromptEdited] = useState(false);
@@ -195,112 +195,111 @@ export function Analysis() {
       {error && <MessageBar intent="error" role="alert">{error}</MessageBar>}
 
       <Card className={styles.panel}>
-        <div className={styles.stack}>
-          <div className="inline">
-            <Text weight="semibold">학교 선택 ({selected.length}/2)</Text>
-            {selectionDone ? (
-              <Button appearance="secondary" onClick={() => { setSelected([]); setStep("none"); setDateConfirmed(false); }} disabled={running}>다시 선택</Button>
-            ) : (
-              <Button appearance="secondary" onClick={() => void loadPool()} disabled={loadingPool || running}>다시 뽑기</Button>
-            )}
-          </div>
-          {selectionDone && (
-            <section aria-label="선택한 학교" className={styles.grid}>
-              {selected.map(item => (
-                <Button key={key(item)} appearance="primary" aria-pressed disabled>
-                  {label(item)}
-                </Button>
-              ))}
-            </section>
-          )}
-          {!selectionDone && loadingPool && <Spinner label="학교 목록을 불러오는 중입니다." />}
-          {!selectionDone && !loadingPool && pool.length === 0 && <MessageBar>표시할 학교가 없습니다.</MessageBar>}
-          {!selectionDone && !loadingPool && pool.length > 0 && (
-            <section aria-label="분석 대상 학교" className={styles.grid}>
-              {pool.map(item => {
-                const active = selected.some(entry => key(entry) === key(item));
-                return (
-                  <Button
-                    key={key(item)}
-                    appearance={active ? "primary" : "secondary"}
-                    aria-pressed={active}
-                    onClick={() => toggle(item)}
+        <Accordion
+          collapsible
+          openItems={step === "none" ? [] : [step]}
+          onToggle={(_, data) => setStep(data.openItems.includes("school") ? "school" : data.openItems.includes("date") ? "date" : data.openItems.includes("prompt") ? "prompt" : "none")}
+        >
+          <AccordionItem value="school">
+            <AccordionHeader>{selectionDone ? `학교 선택 · ${selected.map(item => item.name).join(" vs ")}` : `학교 선택 (${selected.length}/2)`}</AccordionHeader>
+            <AccordionPanel>
+              <div className={styles.stack}>
+                <div className="inline">
+                  {selectionDone ? (
+                    <Button appearance="secondary" onClick={() => { setSelected([]); setStep("school"); setDateConfirmed(false); }} disabled={running}>다시 선택</Button>
+                  ) : (
+                    <Button appearance="secondary" onClick={() => void loadPool()} disabled={loadingPool || running}>다시 뽑기</Button>
+                  )}
+                </div>
+                {selectionDone && (
+                  <section aria-label="선택한 학교" className={styles.grid}>
+                    {selected.map(item => (
+                      <Button key={key(item)} appearance="primary" aria-pressed disabled>
+                        {label(item)}
+                      </Button>
+                    ))}
+                  </section>
+                )}
+                {!selectionDone && loadingPool && <Spinner label="학교 목록을 불러오는 중입니다." />}
+                {!selectionDone && !loadingPool && pool.length === 0 && <MessageBar>표시할 학교가 없습니다.</MessageBar>}
+                {!selectionDone && !loadingPool && pool.length > 0 && (
+                  <section aria-label="분석 대상 학교" className={styles.grid}>
+                    {pool.map(item => {
+                      const active = selected.some(entry => key(entry) === key(item));
+                      return (
+                        <Button
+                          key={key(item)}
+                          appearance={active ? "primary" : "secondary"}
+                          aria-pressed={active}
+                          onClick={() => toggle(item)}
+                          disabled={running}
+                        >
+                          {label(item)}
+                        </Button>
+                      );
+                    })}
+                  </section>
+                )}
+              </div>
+            </AccordionPanel>
+          </AccordionItem>
+          <AccordionItem value="date" disabled={!selectionDone}>
+            <AccordionHeader>분석 날짜 · {date}</AccordionHeader>
+            <AccordionPanel>
+              <div className={styles.stack}>
+                <Field label="분석 날짜" hint="이번 달과 직전 달의 날짜만 선택할 수 있습니다.">
+                  <DatePicker
+                    aria-label="분석 날짜"
+                    value={toDate(date)}
+                    minDate={minDate}
+                    maxDate={maxDate}
                     disabled={running}
-                  >
-                    {label(item)}
-                  </Button>
-                );
-              })}
-            </section>
-          )}
-        </div>
+                    allowTextInput
+                    placeholder="yyyy-mm-dd"
+                    formatDate={toIsoOrEmpty}
+                    parseDateFromString={value => toDate(value) ?? null}
+                    onChange={(_, data) => {
+                      const value = toDate(data.value);
+                      if (!value || !isAllowed(value)) return;
+                      setResult(undefined);
+                      setDate(toIso(value));
+                    }}
+                    onSelectDate={value => {
+                      if (!value || !isAllowed(value)) return;
+                      setResult(undefined);
+                      setDate(toIso(value));
+                    }}
+                  />
+                </Field>
+                <Button appearance="primary" onClick={() => { setDateConfirmed(true); setStep("prompt"); }}>날짜 확정</Button>
+              </div>
+            </AccordionPanel>
+          </AccordionItem>
+          <AccordionItem value="prompt" disabled={!dateConfirmed}>
+            <AccordionHeader>프롬프트</AccordionHeader>
+            <AccordionPanel>
+              <div className={styles.stack}>
+                <Field label="프롬프트" hint="기본 프롬프트를 그대로 쓰거나 직접 수정할 수 있습니다.">
+                  <Textarea
+                    aria-label="프롬프트"
+                    value={prompt}
+                    disabled={running}
+                    resize="vertical"
+                    onChange={(_, data) => {
+                      setPromptEdited(true);
+                      setPrompt(data.value);
+                    }}
+                  />
+                </Field>
+                <Button appearance="primary" onClick={() => setStep("none")}>프롬프트 확정</Button>
+              </div>
+            </AccordionPanel>
+          </AccordionItem>
+        </Accordion>
+        <Button appearance="primary" onClick={() => void start()} disabled={running || selected.length !== 2}>
+          {running ? <Spinner size="tiny" /> : "분석 시작"}
+        </Button>
       </Card>
-
-      {selectionDone && (
-        <Card className={styles.panel}>
-          <Accordion
-            collapsible
-            openItems={step === "none" ? [] : [step]}
-            onToggle={(_, data) => setStep(data.openItems.includes("date") ? "date" : data.openItems.includes("prompt") ? "prompt" : "none")}
-          >
-            <AccordionItem value="date">
-              <AccordionHeader>분석 날짜 · {date}</AccordionHeader>
-              <AccordionPanel>
-                <div className={styles.stack}>
-                  <Field label="분석 날짜" hint="이번 달과 직전 달의 날짜만 선택할 수 있습니다.">
-                    <DatePicker
-                      aria-label="분석 날짜"
-                      value={toDate(date)}
-                      minDate={minDate}
-                      maxDate={maxDate}
-                      disabled={running}
-                      allowTextInput
-                      placeholder="yyyy-mm-dd"
-                      formatDate={toIsoOrEmpty}
-                      parseDateFromString={value => toDate(value) ?? null}
-                      onChange={(_, data) => {
-                        const value = toDate(data.value);
-                        if (!value || !isAllowed(value)) return;
-                        setResult(undefined);
-                        setDate(toIso(value));
-                      }}
-                      onSelectDate={value => {
-                        if (!value || !isAllowed(value)) return;
-                        setResult(undefined);
-                        setDate(toIso(value));
-                      }}
-                    />
-                  </Field>
-                  <Button appearance="primary" onClick={() => { setDateConfirmed(true); setStep("prompt"); }}>날짜 확정</Button>
-                </div>
-              </AccordionPanel>
-            </AccordionItem>
-            <AccordionItem value="prompt" disabled={!dateConfirmed}>
-              <AccordionHeader>프롬프트</AccordionHeader>
-              <AccordionPanel>
-                <div className={styles.stack}>
-                  <Field label="프롬프트" hint="기본 프롬프트를 그대로 쓰거나 직접 수정할 수 있습니다.">
-                    <Textarea
-                      aria-label="프롬프트"
-                      value={prompt}
-                      disabled={running}
-                      resize="vertical"
-                      onChange={(_, data) => {
-                        setPromptEdited(true);
-                        setPrompt(data.value);
-                      }}
-                    />
-                  </Field>
-                  <Button appearance="primary" onClick={() => setStep("none")}>프롬프트 확정</Button>
-                </div>
-              </AccordionPanel>
-            </AccordionItem>
-          </Accordion>
-          <Button appearance="primary" onClick={() => void start()} disabled={running || selected.length !== 2}>
-            {running ? <Spinner size="tiny" /> : "분석 시작"}
-          </Button>
-        </Card>
-      )}
 
       {running && (
         <Card className={styles.panel}>

@@ -146,13 +146,14 @@ describe("급식 배틀 분석 페이지", () => {
     const list = await screen.findByRole("region", { name: "분석 대상 학교" });
     expect(within(list).getAllByRole("button")).toHaveLength(10);
     expect(within(list).getByRole("button", { name: "학교0 · 고등학교 · 지역0" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "분석 시작" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "분석 시작" })).toBeDisabled();
 
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
     await closeSteps(user);
 
     expect(screen.queryByRole("region", { name: "분석 대상 학교" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /학교 선택 · 학교0 vs 학교1/ }));
     const picked = screen.getByRole("region", { name: "선택한 학교" });
     expect(within(picked).getAllByRole("button")).toHaveLength(2);
     expect(within(picked).getByRole("button", { name: "학교0 · 고등학교 · 지역0" })).toBeInTheDocument();
