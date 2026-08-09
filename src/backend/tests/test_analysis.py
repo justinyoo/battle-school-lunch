@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app import analysis
 from app import main
+from app import mcp_client
 from app.evaluation import DeterministicAreaEvaluator, MealFacts, parse_area_payload
 from app.main import app
 from app.rubric import AREAS_BY_ID, RUBRIC_AREAS, TOTAL_WEIGHT, interpret, total_score
@@ -166,6 +167,53 @@ def test_workflow_endpoint_returns_graph() -> None:
     with TestClient(app) as client:
         payload = client.get("/api/analysis/workflow").json()
     assert payload["pattern"] == WORKFLOW_PATTERN
+
+
+async def test_analysis_loads_meals_through_mcp_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    """분석 화면 급식 조회는 내부 NEIS 호출이 아니라 MCP 도구를 사용한다."""
+
+    calls: list[tuple[str, str, str, str]] = []
+
+    async def fake_load(url: str, office: str, school: str, target_date: str) -> dict[str, Any]:
+        calls.append((url, office, school, target_date))
+        return {"items": [{"date": target_date, "menu": ["백미밥"]}]}
+
+    monkeypatch.setattr(mcp_client, "load_lunch_meals", fake_load)
+    payload = await main._load_meals("B10", "1234567", "20260807")
+
+    assert payload["items"][0]["menu"] == ["백미밥"]
+    assert calls == [(main.settings.mcp_server_url, "B10", "1234567", "20260807")]
+
+
+async def test_analysis_reports_error_when_mcp_server_is_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def failing(*_: Any, **__: Any) -> dict[str, Any]:
+        raise mcp_client.McpUnavailableError("급식 MCP 서버를 사용할 수 없습니다.")
+
+    monkeypatch.setattr(mcp_client, "load_lunch_meals", failing)
+    with pytest.raises(main.ApiError) as error:
+        await main._load_meals("B10", "1234567", "20260807")
+    assert error.value.code == "MCP_UNAVAILABLE"
+    assert error.value.status_code == 502
+
+
+async def test_mcp_loader_maps_arguments_to_get_lunch_meals(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_call_tool(url: str, name: str, arguments: dict[str, Any], timeout: float = 20.0) -> dict[str, Any]:
+        captured.update({"url": url, "name": name, "arguments": arguments})
+        return {"items": []}
+
+    monkeypatch.setattr(mcp_client, "call_tool", fake_call_tool)
+    await mcp_client.load_lunch_meals("http://mcp/mcp", "B10", "1234567", "20260807")
+
+    assert captured["url"] == "http://mcp/mcp"
+    assert captured["name"] == "get_lunch_meals"
+    assert captured["arguments"] == {
+        "educationOfficeCode": "B10",
+        "schoolCode": "1234567",
+        "startDate": "20260807",
+        "endDate": "20260807",
+    }
 
 
 def test_official_devui_is_mounted_by_backend() -> None:

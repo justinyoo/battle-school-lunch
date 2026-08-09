@@ -47,6 +47,11 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 브라�
   제공하며, 백엔드 앱과 독립된 NEIS 검증·정규화 로직을 사용합니다. MCP
   도구 오류에도 인증키, 외부 응답 원문 또는 내부 요청 정보를 포함하지
   않습니다.
+- 급식 배틀 분석은 백엔드가 `MCP_SERVER_URL`의 MCP 서버를 Streamable HTTP로
+  호출해 `get_lunch_meals`로 급식을 조회합니다. MCP 서버를 사용할 수 없으면
+  `MCP_UNAVAILABLE` 502 오류로 응답하며, 급식 메뉴 조회 화면은 기존
+  `/api/meals` 경로를 그대로 사용합니다. 백엔드의 MCP 클라이언트 의존성은
+  Agent Framework 호환 범위인 `mcp>=1.24,<2`를 유지합니다.
 - 프론트엔드는 API 응답을 사용하기 전에 런타임 타입 검증을 수행합니다.
   학교명 trim 후 두 글자 이상에서 350ms 디바운스 검색을 사용하며,
   검색·급식 조회의 오래된 응답이 최신 상태를 덮어쓰지 않도록 요청 ID를
@@ -58,7 +63,8 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 브라�
 
 - 백엔드와 MCP 서버 설정은 각각 `pydantic-settings`로 `.env` 및 환경
   변수에서 읽습니다. 주요 변수는 `NEIS_API_KEY`, `NEIS_BASE_URL`,
-  `CORS_ORIGINS`, `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`입니다.
+  `CORS_ORIGINS`, `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`,
+  `MCP_SERVER_URL`입니다.
 - `.env.example`을 참고해 로컬 `.env`를 만들고, 비밀 값·자격 증명·로컬
   환경 파일은 커밋하지 않습니다.
 - NEIS 인증키는 백엔드와 MCP 서버에만 전달하며 코드, 프론트엔드 번들, 로그,

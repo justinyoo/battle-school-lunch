@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from . import analysis
+from . import mcp_client
 from .providers import create_evaluator
 from .rubric import RUBRIC_AREAS, TOTAL_WEIGHT
 from .workflow import WORKFLOW_PATTERN, build_workflow, workflow_graph
@@ -53,6 +54,7 @@ class Settings(BaseSettings):
     agent_provider: str = "deterministic"
     copilot_model: str = ""
     copilot_cli_path: str = ""
+    mcp_server_url: str = "http://localhost:8001/mcp"
     devui_host: str = "127.0.0.1"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
@@ -328,13 +330,17 @@ def _evaluator():
 
 
 async def _load_meals(education_office_code: str, school_code: str, target_date: str) -> dict[str, Any]:
-    response = await meals(
-        education_office_code=education_office_code,
-        school_code=school_code,
-        from_date=target_date,
-        to_date=target_date,
-    )
-    return response.model_dump(by_alias=True)
+    """분석 화면은 내부 NEIS 호출 대신 MCP 서버의 도구를 통해 급식을 조회한다."""
+
+    try:
+        return await mcp_client.load_lunch_meals(
+            settings.mcp_server_url,
+            education_office_code,
+            school_code,
+            target_date,
+        )
+    except mcp_client.McpUnavailableError as error:
+        raise ApiError("MCP_UNAVAILABLE", "급식 MCP 서버를 사용할 수 없습니다.", 502) from error
 
 
 def _validate_analysis_date(value: str) -> str:

@@ -25,7 +25,7 @@ NEIS Open API
     v
 Python 백엔드 -> 정규화된 JSON -> React 프론트엔드
 
-MCP 클라이언트
+MCP 클라이언트 또는 급식 배틀 분석 백엔드
     |  Streamable HTTP 또는 stdio
     v
 Python MCP 서버 -> 정규화된 JSON -> NEIS Open API
@@ -76,6 +76,14 @@ Python MCP 서버 -> 정규화된 JSON -> NEIS Open API
 - `src/mcp`가 설정, NEIS 요청, 입력 검증 및 정규화를 독립적으로 소유한다.
   입력 및 upstream 오류는 민감한 원문을 포함하지 않는 MCP 도구 오류로
   반환하며, 검색·급식 결과 없음은 빈 `items`와 명확한 메시지로 반환한다.
+- 급식 배틀 분석은 백엔드 내부 NEIS 호출 대신 이 MCP 서버의
+  `get_lunch_meals` 도구를 Streamable HTTP로 호출해 급식 정보를 가져온다.
+  백엔드는 `MCP_SERVER_URL` 설정으로 대상 서버를 지정하며, 연결이나 도구
+  호출이 실패하면 `MCP_UNAVAILABLE` 코드의 502 오류로 응답한다. 급식 메뉴
+  조회 화면은 기존 `/api/meals` 내부 API 경로를 그대로 사용한다.
+- 백엔드의 MCP 클라이언트 의존성은 Agent Framework가 요구하는 범위에 맞춰
+  `mcp>=1.24,<2`로 고정한다. MCP SDK 2.x는 Agent Framework가 지원하지
+  않으므로 사용하지 않는다.
 
 ## 3. 내부 API 설계
 
