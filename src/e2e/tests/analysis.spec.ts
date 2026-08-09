@@ -17,10 +17,13 @@ test("분석 페이지에서 두 학교를 골라 배틀 결과를 확인한다"
   await expect(datePicker).toBeVisible();
   await datePicker.fill(isoToday);
   await datePicker.press("Enter");
-  await datePicker.press("Escape");
+  await page.keyboard.press("Escape");
 
-  await page.getByRole("button", { name: "프롬프트" }).click();
-  await expect(page.getByRole("textbox", { name: "프롬프트" })).toHaveValue(/분석고등학교/);
+  const prompt = page.getByRole("textbox", { name: "프롬프트" });
+  if (!(await prompt.isVisible())) {
+    await page.getByRole("button", { name: "프롬프트" }).click();
+  }
+  await expect(prompt).toHaveValue(/분석고등학교/);
 
   await page.getByRole("button", { name: "분석 시작" }).click();
 

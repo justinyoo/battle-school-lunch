@@ -16,10 +16,10 @@ echo "Running frontend tests..."
 npm --prefix "$ROOT/src/frontend" test -- --run
 
 echo "Running backend tests..."
-uv run --project "$ROOT/src/backend" --extra dev pytest
+(cd "$ROOT/src/backend" && uv run --extra dev pytest)
 
 echo "Running MCP tests..."
-uv run --project "$ROOT/src/mcp" --extra dev pytest
+(cd "$ROOT/src/mcp" && uv run --extra dev pytest)
 
 echo "Running E2E tests..."
 npm --prefix "$ROOT/src/e2e" test

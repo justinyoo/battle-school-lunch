@@ -20,9 +20,9 @@ finally {
 }
 
 Write-Host "Running backend tests..."
-Push-Location $root
+Push-Location (Join-Path $root "src\backend")
 try {
-    & uv run --project src/backend --extra dev pytest
+    & uv run --extra dev pytest
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 finally {
@@ -30,9 +30,9 @@ finally {
 }
 
 Write-Host "Running MCP tests..."
-Push-Location $root
+Push-Location (Join-Path $root "src\mcp")
 try {
-    & uv run --project src/mcp --extra dev pytest
+    & uv run --extra dev pytest
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 finally {
