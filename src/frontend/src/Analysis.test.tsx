@@ -98,7 +98,7 @@ describe("급식 배틀 분석 페이지", () => {
     expect(dates).not.toContain("2026-04-01");
   });
 
-  it("무작위 학교 10곳을 보여주고 두 곳까지만 선택하게 한다", async () => {
+  it("무작위 학교 10곳을 보여주고 두 곳을 고르면 선택 결과만 남긴다", async () => {
     const user = userEvent.setup();
     render(<Analysis />);
 
@@ -109,8 +109,15 @@ describe("급식 배틀 분석 페이지", () => {
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
 
-    expect(within(list).getByRole("button", { name: /학교2/ })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "분석 대상 학교" })).not.toBeInTheDocument();
+    const picked = screen.getByRole("region", { name: "선택한 학교" });
+    expect(within(picked).getAllByRole("button")).toHaveLength(2);
+    expect(within(picked).getByRole("button", { name: /학교0/ })).toBeInTheDocument();
+    expect(within(picked).getByRole("button", { name: /학교1/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "분석 시작" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "다시 선택" }));
+    expect(await screen.findByRole("region", { name: "분석 대상 학교" })).toBeInTheDocument();
   });
 
   it("선택한 두 학교로 기본 프롬프트를 만들고 편집할 수 있다", async () => {

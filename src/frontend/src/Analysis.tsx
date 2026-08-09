@@ -110,6 +110,8 @@ export function Analysis() {
 
   const areaIds = useMemo(() => (graph?.nodes ?? []).filter(node => node.kind === "area").map(node => node.id), [graph]);
 
+  const selectionDone = selected.length === 2;
+
   const start = async () => {
     if (selected.length !== 2) {
       setError("학교를 정확히 두 곳 선택해 주세요.");
@@ -162,11 +164,24 @@ export function Analysis() {
         <div className={styles.stack}>
           <div className="inline">
             <Text weight="semibold">학교 선택 ({selected.length}/2)</Text>
-            <Button appearance="secondary" onClick={() => void loadPool()} disabled={loadingPool || running}>다시 뽑기</Button>
+            {selectionDone ? (
+              <Button appearance="secondary" onClick={() => setSelected([])} disabled={running}>다시 선택</Button>
+            ) : (
+              <Button appearance="secondary" onClick={() => void loadPool()} disabled={loadingPool || running}>다시 뽑기</Button>
+            )}
           </div>
-          {loadingPool && <Spinner label="학교 목록을 불러오는 중입니다." />}
-          {!loadingPool && pool.length === 0 && <MessageBar>표시할 학교가 없습니다.</MessageBar>}
-          {!loadingPool && pool.length > 0 && (
+          {selectionDone && (
+            <section aria-label="선택한 학교" className={styles.grid}>
+              {selected.map(item => (
+                <Button key={key(item)} appearance="primary" aria-pressed disabled>
+                  {item.name} · {item.schoolKind}
+                </Button>
+              ))}
+            </section>
+          )}
+          {!selectionDone && loadingPool && <Spinner label="학교 목록을 불러오는 중입니다." />}
+          {!selectionDone && !loadingPool && pool.length === 0 && <MessageBar>표시할 학교가 없습니다.</MessageBar>}
+          {!selectionDone && !loadingPool && pool.length > 0 && (
             <section aria-label="분석 대상 학교" className={styles.grid}>
               {pool.map(item => {
                 const active = selected.some(entry => key(entry) === key(item));
@@ -176,7 +191,7 @@ export function Analysis() {
                     appearance={active ? "primary" : "secondary"}
                     aria-pressed={active}
                     onClick={() => toggle(item)}
-                    disabled={running || (!active && selected.length >= 2)}
+                    disabled={running}
                   >
                     {item.name} · {item.schoolKind}
                   </Button>
