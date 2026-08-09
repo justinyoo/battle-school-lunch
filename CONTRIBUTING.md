@@ -35,13 +35,21 @@ uv sync --extra dev
 uv run --extra dev pytest
 ```
 
+MCP 서버 설정 및 검사:
+
+```sh
+cd src/mcp
+uv sync --extra dev
+uv run --extra dev pytest
+```
+
 전체 애플리케이션 실행:
 
 ```sh
 docker compose up --build
 ```
 
-프론트엔드와 백엔드 테스트를 한 번에 실행:
+프론트엔드, 백엔드 및 MCP 테스트를 한 번에 실행:
 
 ```powershell
 pwsh ./scripts/test-all.ps1

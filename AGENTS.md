@@ -4,16 +4,17 @@
 
 급식배틀은 NEIS 공개 API에서 학교와 중식 데이터를 조회해 날짜별로
 표시하는 웹 애플리케이션입니다. React 19/TypeScript 프론트엔드와
-FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 백엔드에서만
-수행합니다.
+FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 브라우저가 아닌
+백엔드와 독립 MCP 서버에서 수행합니다.
 
 - `src/frontend/`: Vite 기반 React 애플리케이션
 - `src/backend/`: FastAPI 애플리케이션과 `pytest` 테스트
+- `src/mcp/`: 공식 MCP SDK 1.x 기반 독립 MCP 서버와 `pytest` 테스트
 - `src/e2e/`: Playwright 기반 브라우저 E2E 테스트와 로컬 NEIS mock
 - `src/openapi.json`: 내부 API 계약
 - `data/`: NEIS 공개 API 원본 명세
 - `scripts/`: 로컬 실행 및 전체 테스트 스크립트
-- `compose.yml`: `frontend`와 `backend` Docker Compose 서비스
+- `compose.yml`: `frontend`, `backend`, `mcp` Docker Compose 서비스
 
 ## 작업 원칙
 
@@ -42,6 +43,10 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 백엔�
 - NEIS 응답의 `row`를 정규화하고 최상위 또는 섹션 `head`의 `RESULT`를
   처리합니다. `INFO-000`은 정상, `INFO-200`은 빈 결과이며 그 밖의
   upstream 오류와 잘못된 JSON은 기존의 502 오류 매핑을 따릅니다.
+- MCP 서버는 `src/mcp`에서 `search_schools`, `get_lunch_meals` 도구만
+  제공하며, 백엔드 앱과 독립된 NEIS 검증·정규화 로직을 사용합니다. MCP
+  도구 오류에도 인증키, 외부 응답 원문 또는 내부 요청 정보를 포함하지
+  않습니다.
 - 프론트엔드는 API 응답을 사용하기 전에 런타임 타입 검증을 수행합니다.
   학교명 trim 후 두 글자 이상에서 350ms 디바운스 검색을 사용하며,
   검색·급식 조회의 오래된 응답이 최신 상태를 덮어쓰지 않도록 요청 ID를
@@ -51,12 +56,14 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 백엔�
 
 ## 설정과 보안
 
-- 백엔드 설정은 `pydantic-settings`로 `.env` 및 환경 변수에서 읽습니다.
-  주요 변수는 `NEIS_API_KEY`, `NEIS_BASE_URL`, `CORS_ORIGINS`입니다.
+- 백엔드와 MCP 서버 설정은 각각 `pydantic-settings`로 `.env` 및 환경
+  변수에서 읽습니다. 주요 변수는 `NEIS_API_KEY`, `NEIS_BASE_URL`,
+  `CORS_ORIGINS`, `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`입니다.
 - `.env.example`을 참고해 로컬 `.env`를 만들고, 비밀 값·자격 증명·로컬
   환경 파일은 커밋하지 않습니다.
-- NEIS 인증키는 백엔드에만 전달하며 코드, 프론트엔드 번들, 로그, 오류
-  응답에 하드코딩하거나 기록하지 않습니다.
+- NEIS 인증키는 백엔드와 MCP 서버에만 전달하며 코드, 프론트엔드 번들, 로그,
+  오류 응답에 하드코딩하거나 기록하지 않습니다. Azure 배포에서는 Key Vault와
+  각 Container App의 관리 ID를 사용합니다.
 - CORS는 허용된 프론트엔드 출처로 제한합니다. 사용자 입력과 외부 응답은
   신뢰하지 않고 기존 검증·정규화 경계를 우회하지 않습니다.
 - 외부 요청에는 기존 timeout과 오류 분류를 유지하고, 무제한 재시도나
@@ -74,6 +81,9 @@ npm install
 cd ../backend
 uv sync --extra dev
 
+cd ../mcp
+uv sync --extra dev
+
 cd ../e2e
 npm install
 npx playwright install chromium
@@ -86,7 +96,8 @@ docker compose up --build
 ```
 
 프론트엔드는 `http://localhost:5173`, 백엔드는
-`http://localhost:8000`, 백엔드 상태 확인은 `/health`입니다. Docker 없이
+`http://localhost:8000`, MCP 서버는
+`http://localhost:8001/mcp`, 백엔드 상태 확인은 `/health`입니다. Docker 없이
 로컬 개발을 할 때는 `pwsh ./scripts/start-local.ps1` 또는
 `bash ./scripts/start-local.sh`를 사용합니다.
 
@@ -98,6 +109,7 @@ docker compose up --build
 
 - 프론트엔드: `cd src/frontend && npm run build && npm test`
 - 백엔드: `cd src/backend && uv run --extra dev pytest`
+- MCP: `cd src/mcp && uv run --extra dev pytest`
 - 전체: `pwsh ./scripts/test-all.ps1` 또는 `bash ./scripts/test-all.sh`
 - E2E: `cd src/e2e && npm test`
 - Compose 변경: `docker compose config`

@@ -35,19 +35,11 @@ module application './modules/application.bicep' = {
   }
 }
 
-module acrPull './modules/acr-pull-role.bicep' = {
-  name: 'acrPull'
-  scope: resourceGroup
-  params: {
-    registryName: application.outputs.registryName
-    backendPrincipalId: application.outputs.backendPrincipalId
-    frontendPrincipalId: application.outputs.frontendPrincipalId
-  }
-}
-
 output AZURE_RESOURCE_GROUP string = resourceGroup.name
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = application.outputs.registryLoginServer
 output AZURE_KEY_VAULT_NAME string = application.outputs.keyVaultName
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = application.outputs.logAnalyticsWorkspaceId
 output FRONTEND_URL string = application.outputs.frontendUrl
+output BACKEND_URL string = application.outputs.backendUrl
 output BACKEND_HEALTH_URL string = application.outputs.backendHealthUrl
+output MCP_URL string = application.outputs.mcpUrl

@@ -18,6 +18,9 @@ npm --prefix "$ROOT/src/frontend" test -- --run
 echo "Running backend tests..."
 uv run --project "$ROOT/src/backend" --extra dev pytest
 
+echo "Running MCP tests..."
+uv run --project "$ROOT/src/mcp" --extra dev pytest
+
 echo "Running E2E tests..."
 npm --prefix "$ROOT/src/e2e" test
 

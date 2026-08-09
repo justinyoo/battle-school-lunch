@@ -19,6 +19,9 @@ param backendImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworl
 @description('Container image used while provisioning the frontend. AZD replaces it during deployment.')
 param frontendImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
+@description('Container image used while provisioning the MCP server. AZD replaces it during deployment.')
+param mcpImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
 var abbreviations = loadJsonContent('../abbreviations.json')
 var suffix = take(uniqueString(subscription().id, resourceGroup().id, name), 6)
 var registryName = replace(toLower('${abbreviations.containerRegistry}${name}${suffix}'), '-', '')
@@ -28,7 +31,12 @@ var keyVaultName = take(replace(toLower('${abbreviations.keyVault}${name}${suffi
 var environmentName = toLower('${abbreviations.containerAppEnvironment}-${name}-${suffix}')
 var backendName = toLower('${abbreviations.containerApp}-${name}-backend')
 var frontendName = toLower('${abbreviations.containerApp}-${name}-frontend')
+var mcpName = toLower('${abbreviations.containerApp}-${name}-mcp')
 var backendIdentityName = take(replace(toLower('${abbreviations.userAssignedIdentity}-${name}-backend'), '-', ''), 128)
+var frontendIdentityName = take(replace(toLower('${abbreviations.userAssignedIdentity}-${name}-frontend'), '-', ''), 128)
+var mcpIdentityName = take(replace(toLower('${abbreviations.userAssignedIdentity}-${name}-mcp'), '-', ''), 128)
+var acrPullRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+var keyVaultSecretsUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
@@ -131,8 +139,66 @@ resource backendKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-
   name: guid(keyVault.id, backendIdentity.id, 'keyvault-secrets-user')
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    roleDefinitionId: keyVaultSecretsUserRoleId
     principalId: backendIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource frontendIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: frontendIdentityName
+  location: location
+  tags: union(tags, {
+    'azd-service-name': 'frontend-identity'
+  })
+}
+
+resource mcpIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: mcpIdentityName
+  location: location
+  tags: union(tags, {
+    'azd-service-name': 'mcp-identity'
+  })
+}
+
+resource mcpKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, mcpIdentity.id, 'keyvault-secrets-user')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: keyVaultSecretsUserRoleId
+    principalId: mcpIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// ACR pull rights are granted to the user-assigned identities before the
+// Container Apps are created so the first revision can pull its image.
+resource backendAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(registry.id, backendIdentity.id, 'acrpull')
+  scope: registry
+  properties: {
+    roleDefinitionId: acrPullRoleId
+    principalId: backendIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource frontendAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(registry.id, frontendIdentity.id, 'acrpull')
+  scope: registry
+  properties: {
+    roleDefinitionId: acrPullRoleId
+    principalId: frontendIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource mcpAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(registry.id, mcpIdentity.id, 'acrpull')
+  scope: registry
+  properties: {
+    roleDefinitionId: acrPullRoleId
+    principalId: mcpIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -141,7 +207,7 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
   name: backendName
   location: location
   identity: {
-    type: 'SystemAssigned,UserAssigned'
+    type: 'UserAssigned'
     userAssignedIdentities: {
       '${backendIdentity.id}': {}
     }
@@ -152,7 +218,7 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: registry.properties.loginServer
-          identity: 'system'
+          identity: backendIdentity.id
         }
       ]
       ingress: {
@@ -227,6 +293,7 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
   dependsOn: [
     neisApiKeySecret
     backendKeyVaultAccess
+    backendAcrPull
   ]
 }
 
@@ -234,7 +301,10 @@ resource frontend 'Microsoft.App/containerApps@2024-03-01' = {
   name: frontendName
   location: location
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${frontendIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerEnvironment.id
@@ -242,7 +312,7 @@ resource frontend 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: registry.properties.loginServer
-          identity: 'system'
+          identity: frontendIdentity.id
         }
       ]
       ingress: {
@@ -299,13 +369,117 @@ resource frontend 'Microsoft.App/containerApps@2024-03-01' = {
   tags: union(tags, {
     'azd-service-name': 'frontend'
   })
+  dependsOn: [
+    frontendAcrPull
+  ]
+}
+
+resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: mcpName
+  location: location
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${mcpIdentity.id}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: containerEnvironment.id
+    configuration: {
+      registries: [
+        {
+          server: registry.properties.loginServer
+          identity: mcpIdentity.id
+        }
+      ]
+      ingress: {
+        external: true
+        targetPort: 8001
+        transport: 'auto'
+        allowInsecure: false
+      }
+      secrets: [
+        {
+          name: 'neis-api-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/neis-api-key'
+          identity: mcpIdentity.id
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'mcp'
+          image: mcpImage
+          env: [
+            {
+              name: 'NEIS_API_KEY'
+              secretRef: 'neis-api-key'
+            }
+            {
+              name: 'NEIS_BASE_URL'
+              value: 'https://open.neis.go.kr/hub'
+            }
+            {
+              name: 'MCP_TRANSPORT'
+              value: 'streamable-http'
+            }
+            {
+              name: 'MCP_HOST'
+              value: '0.0.0.0'
+            }
+            {
+              name: 'MCP_PORT'
+              value: '8001'
+            }
+          ]
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          probes: [
+            {
+              type: 'Liveness'
+              tcpSocket: {
+                port: 8001
+              }
+              initialDelaySeconds: 10
+              periodSeconds: 30
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 2
+        rules: [
+          {
+            name: 'http-scaling'
+            http: {
+              metadata: {
+                concurrentRequests: '50'
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+  tags: union(tags, {
+    'azd-service-name': 'mcp'
+  })
+  dependsOn: [
+    neisApiKeySecret
+    mcpKeyVaultAccess
+    mcpAcrPull
+  ]
 }
 
 output frontendUrl string = 'https://${frontend.properties.configuration.ingress.fqdn}'
+output backendUrl string = 'https://${backend.properties.configuration.ingress.fqdn}'
 output backendHealthUrl string = 'https://${backend.properties.configuration.ingress.fqdn}/health'
+output mcpUrl string = 'https://${mcp.properties.configuration.ingress.fqdn}/mcp'
 output registryName string = registry.name
 output registryLoginServer string = registry.properties.loginServer
 output keyVaultName string = keyVault.name
 output logAnalyticsWorkspaceId string = logAnalytics.id
-output backendPrincipalId string = backend.identity.principalId
-output frontendPrincipalId string = frontend.identity.principalId
