@@ -20,7 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "agent-framework-devui>=1.0.0b260730",
-    "pytest>=8.3",
+    "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]
 
