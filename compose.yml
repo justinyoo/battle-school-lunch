@@ -6,8 +6,19 @@ services:
         required: false
     ports: ["8000:8000"]
     healthcheck: { test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"], interval: 10s, timeout: 3s, retries: 5 }
+  mcp:
+    build: ./src/mcp
+    command: ["python", "-m", "school_lunch_mcp.server"]
+    environment:
+      MCP_TRANSPORT: streamable-http
+    env_file:
+      - path: .env
+        required: false
+    ports: ["8001:8001"]
   frontend:
     build: ./src/frontend
+    environment:
+      BACKEND_URL: http://backend:8000
     ports: ["5173:80"]
     depends_on:
       backend: { condition: service_healthy }

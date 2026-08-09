@@ -29,6 +29,16 @@ finally {
     Pop-Location
 }
 
+Write-Host "Running MCP tests..."
+Push-Location $root
+try {
+    & uv run --project src/mcp --extra dev pytest
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+finally {
+    Pop-Location
+}
+
 Write-Host "Running E2E tests..."
 & npm.cmd --prefix (Join-Path $root "src\e2e") test
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -2,10 +2,11 @@
 
 ## 1. 설계 목표
 
-React 프론트엔드와 Python 백엔드를 분리하고, 백엔드만 NEIS 공개 API와
-통신하도록 구성한다. 프론트엔드는 사용자 흐름과 화면 상태를 담당하며,
-백엔드는 입력 검증, 외부 API 호출, 응답 정규화 및 오류 변환을 담당한다.
-두 애플리케이션은 Docker Compose로 함께 빌드하고 실행한다.
+React 프론트엔드, Python 백엔드 및 독립 Python MCP 서버를 분리한다.
+브라우저는 내부 HTTP API만 호출하며, 백엔드와 MCP 서버만 NEIS 공개 API와
+통신한다. 프론트엔드는 사용자 흐름과 화면 상태를 담당하고, 각 서버는
+입력 검증, 외부 API 호출, 응답 정규화 및 오류 변환을 담당한다. 세
+애플리케이션은 Docker Compose로 함께 빌드하고 실행한다.
 
 ## 2. 시스템 구성
 
@@ -23,6 +24,11 @@ NEIS Open API
     |  /schoolInfo, /mealServiceDietInfo
     v
 Python 백엔드 -> 정규화된 JSON -> React 프론트엔드
+
+MCP 클라이언트
+    |  Streamable HTTP 또는 stdio
+    v
+Python MCP 서버 -> 정규화된 JSON -> NEIS Open API
 ```
 
 ### 2.1 프론트엔드
@@ -58,6 +64,18 @@ Python 백엔드 -> 정규화된 JSON -> React 프론트엔드
 - `ATPT_OFCDC_SC_CODE`와 `SD_SCHUL_CODE`로 학교를 식별하고,
   `MLSV_FROM_YMD`, `MLSV_TO_YMD` 및 `MMEAL_SC_CODE=2`로 급식을 조회한다.
 - 프론트엔드에는 학교 식별에 필요한 필드와 날짜별 중식 결과만 반환한다.
+
+### 2.3 MCP 서버
+
+- 공식 Python MCP SDK 1.x의 `FastMCP`로 별도 프로세스를 실행한다.
+- Streamable HTTP는 기본적으로 `http://localhost:8001/mcp`에서, 로컬
+  도구 통합은 stdio 전송으로 제공한다.
+- `search_schools` 도구는 학교명 일부로 이름, 교육청 코드, 학교 코드를
+  반환한다. `get_lunch_meals` 도구는 `educationOfficeCode`, `schoolCode`,
+  `startDate`, `endDate`로 중식만 반환한다.
+- `src/mcp`가 설정, NEIS 요청, 입력 검증 및 정규화를 독립적으로 소유한다.
+  입력 및 upstream 오류는 민감한 원문을 포함하지 않는 MCP 도구 오류로
+  반환하며, 검색·급식 결과 없음은 빈 `items`와 명확한 메시지로 반환한다.
 
 ## 3. 내부 API 설계
 
@@ -164,14 +182,23 @@ FastAPI가 생성하는 누락·형식·길이 검증 오류도 기본 `detail` 
 
 ## 5. Docker Compose 구성
 
-- 루트의 Compose 설정은 `frontend`와 `backend` 두 서비스를 정의한다.
+- 루트의 Compose 설정은 `frontend`, `backend`, `mcp` 세 서비스를 정의한다.
+- `azure.yaml`과 `infra/modules/application.bicep`은 세 서비스를 각각 Azure
+  Container Apps로 배포하며, MCP 서비스는 외부 HTTPS ingress의 `/mcp` 경로에서
+  Streamable HTTP(8001)를 제공한다.
+- MCP Container App은 별도 사용자 할당 관리 ID를 사용해 ACR 이미지를 pull하고
+  Key Vault의 `neis-api-key` secret만 읽는다.
 - 프론트엔드 서비스는 React 애플리케이션을 빌드하고 정적 자산을 제공한다.
 - 백엔드 서비스는 Python 애플리케이션과 의존성을 포함하고 내부 API를
   제공한다.
+- MCP 서비스는 `src/mcp`의 독립 Python 이미지를 사용해
+  `school_lunch_mcp.server` 모듈을 실행하고 8001 포트에서 MCP Streamable
+  HTTP를 제공한다.
 - 프론트엔드의 백엔드 주소는 Compose 서비스 이름 또는 환경 변수로
   주입하며 코드에 환경별 호스트를 하드코딩하지 않는다.
-- NEIS 인증키는 `.env` 또는 실행 환경의 비밀 설정으로 백엔드에만
-  전달한다. 비밀 파일은 버전 관리 대상에서 제외한다.
+- NEIS 인증키는 `.env` 또는 실행 환경의 비밀 설정으로 백엔드와 MCP에만
+  전달한다. 비밀 파일은 버전 관리 대상에서 제외하며, Azure에서는 Key Vault와
+  Container App 관리 ID를 사용한다.
 - 서비스 간 통신에 필요한 포트와 헬스체크를 정의하고, 프론트엔드가
   백엔드 준비 전에 시작해도 명확한 오류 상태를 표시하도록 한다.
 - 로컬 개발과 배포 이미지의 차이를 줄이기 위해 동일한 컨테이너 빌드
@@ -209,7 +236,14 @@ FastAPI가 생성하는 누락·형식·길이 검증 오류도 기본 `detail` 
 외부 네트워크를 사용하지 않고 고정된 NEIS 응답 fixture 또는 모킹된
 HTTP 클라이언트를 사용한다.
 
-### 6.3 백엔드 통합 테스트
+### 6.3 MCP 테스트
+
+- MCP 서버가 `search_schools`, `get_lunch_meals` 도구를 등록하는지 확인한다.
+- stdio MCP 클라이언트가 서버에 연결하여 도구 목록을 조회하는지 확인한다.
+- 도구 호출이 NEIS 요청 파라미터, 중식 필터링, 빈 결과와 안전한 오류를
+  올바르게 처리하는지 확인한다.
+
+### 6.4 백엔드 통합 테스트
 
 실제 HTTP 애플리케이션 경계에서 내부 학교 검색·급식 엔드포인트를
 호출하고, 외부 NEIS 클라이언트를 모킹하여 다음을 검증한다.
@@ -220,7 +254,7 @@ HTTP 클라이언트를 사용한다.
 - 외부 오류와 빈 데이터가 정의된 상태 코드·응답 형식으로 변환되는지
 - 입력 오류가 외부 API 호출 전에 차단되는지
 
-### 6.4 E2E 테스트
+### 6.5 E2E 테스트
 
 Playwright 설정이 실제 Vite 프론트엔드와 FastAPI 백엔드를 별도 프로세스로
 실행한 뒤 브라우저에서 전체 사용자 흐름을 검증한다. 브라우저 요청을
@@ -241,7 +275,8 @@ Playwright에서 가로채지 않으며, FastAPI의 `NEIS_BASE_URL`만 표준 �
 
 ## 7. 보안 및 운영 고려사항
 
-- NEIS 인증키는 백엔드 환경 변수 또는 비밀 저장소로만 관리한다.
+- NEIS 인증키는 백엔드와 MCP 서버의 환경 변수 또는 비밀 저장소로만 관리한다.
+  Azure에서는 Key Vault secret을 각 Container App의 관리 ID로 읽는다.
 - CORS는 허용된 프론트엔드 출처로 제한한다.
 - 학교명과 코드 같은 사용자 입력은 길이·문자 형식·허용 범위를
   검증하고 로그에 원문을 불필요하게 남기지 않는다.
