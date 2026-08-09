@@ -283,7 +283,7 @@ export function Analysis() {
                     value={prompt}
                     disabled={running}
                     resize="vertical"
-                    textarea={{ rows: 10 }}
+                    textarea={{ rows: 4 }}
                     onChange={(_, data) => {
                       setPrompt(data.value);
                     }}
