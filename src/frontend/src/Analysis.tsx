@@ -1,5 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Card, Field, MessageBar, Spinner, Text, Textarea, Title2, makeStyles, tokens } from "@fluentui/react-components";
+import {
+  Button,
+  Card,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Field,
+  MessageBar,
+  Spinner,
+  Text,
+  Textarea,
+  Title2,
+  makeStyles,
+  tokens,
+} from "@fluentui/react-components";
 import { AnalysisProgress, AnalysisResult, AnalysisTarget, School, WorkflowGraph, fetchAnalysisPrompt, fetchRandomSchools, fetchWorkflowGraph, runAnalysis } from "./api";
 import { DatePicker } from "@fluentui/react-datepicker-compat";
 import { NodeState, WorkflowView } from "./WorkflowView";
@@ -49,6 +66,7 @@ export function Analysis() {
   const [maxDate] = useState(() => toDate(dates[dates.length - 1]));
   const isAllowed = (value: Date) => dates.includes(toIso(value));
   const [date, setDate] = useState(() => toIso(new Date()));
+  const [step, setStep] = useState<"none" | "date" | "prompt">("none");
   const [prompt, setPrompt] = useState("");
   const [promptEdited, setPromptEdited] = useState(false);
   const [result, setResult] = useState<AnalysisResult>();
@@ -114,7 +132,9 @@ export function Analysis() {
       const exists = current.some(item => key(item) === key(school));
       if (exists) return current.filter(item => key(item) !== key(school));
       if (current.length >= 2) return current;
-      return [...current, school];
+      const next = [...current, school];
+      if (next.length === 2) setStep("date");
+      return next;
     });
   };
 
@@ -180,7 +200,7 @@ export function Analysis() {
           <div className="inline">
             <Text weight="semibold">학교 선택 ({selected.length}/2)</Text>
             {selectionDone ? (
-              <Button appearance="secondary" onClick={() => setSelected([])} disabled={running}>다시 선택</Button>
+              <Button appearance="secondary" onClick={() => { setSelected([]); setStep("none"); }} disabled={running}>다시 선택</Button>
             ) : (
               <Button appearance="secondary" onClick={() => void loadPool()} disabled={loadingPool || running}>다시 뽑기</Button>
             )}
@@ -217,49 +237,87 @@ export function Analysis() {
         </div>
       </Card>
 
-      <Card className={styles.panel}>
-        <div className={styles.stack}>
-          <Field label="분석 날짜" hint="이번 달과 직전 달의 날짜만 선택할 수 있습니다.">
-            <DatePicker
-              aria-label="분석 날짜"
-              value={toDate(date)}
-              minDate={minDate}
-              maxDate={maxDate}
-              disabled={running}
-              allowTextInput
-              placeholder="yyyy-mm-dd"
-              formatDate={toIsoOrEmpty}
-              parseDateFromString={value => toDate(value) ?? null}
-              onChange={(_, data) => {
-                const value = toDate(data.value);
-                if (!value || !isAllowed(value)) return;
-                setResult(undefined);
-                setDate(toIso(value));
-              }}
-              onSelectDate={value => {
-                if (!value || !isAllowed(value)) return;
-                setResult(undefined);
-                setDate(toIso(value));
-              }}
-            />
-          </Field>
-          <Field label="프롬프트" hint="기본 프롬프트를 그대로 쓰거나 직접 수정할 수 있습니다.">
-            <Textarea
-              aria-label="프롬프트"
-              value={prompt}
-              disabled={running}
-              resize="vertical"
-              onChange={(_, data) => {
-                setPromptEdited(true);
-                setPrompt(data.value);
-              }}
-            />
-          </Field>
-          <Button appearance="primary" onClick={() => void start()} disabled={running || selected.length !== 2}>
-            {running ? <Spinner size="tiny" /> : "분석 시작"}
-          </Button>
-        </div>
-      </Card>
+      {selectionDone && (
+        <Card className={styles.panel}>
+          <div className={styles.stack}>
+            <div className="inline">
+              <Text weight="semibold">분석 날짜</Text>
+              <Button appearance="secondary" onClick={() => setStep("date")} disabled={running}>날짜 변경</Button>
+            </div>
+            <Text className={styles.meta}>{date}</Text>
+            <div className="inline">
+              <Text weight="semibold">프롬프트</Text>
+              <Button appearance="secondary" onClick={() => setStep("prompt")} disabled={running}>프롬프트 편집</Button>
+            </div>
+            <Button appearance="primary" onClick={() => void start()} disabled={running || selected.length !== 2}>
+              {running ? <Spinner size="tiny" /> : "분석 시작"}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Dialog open={step === "date"} onOpenChange={(_, data) => { if (!data.open) setStep("none"); }}>
+        <DialogSurface aria-label="분석 날짜 선택">
+          <DialogBody>
+            <DialogTitle>분석 날짜 선택</DialogTitle>
+            <DialogContent>
+              <Field label="분석 날짜" hint="이번 달과 직전 달의 날짜만 선택할 수 있습니다.">
+                <DatePicker
+                  aria-label="분석 날짜"
+                  value={toDate(date)}
+                  minDate={minDate}
+                  maxDate={maxDate}
+                  disabled={running}
+                  allowTextInput
+                  placeholder="yyyy-mm-dd"
+                  formatDate={toIsoOrEmpty}
+                  parseDateFromString={value => toDate(value) ?? null}
+                  onChange={(_, data) => {
+                    const value = toDate(data.value);
+                    if (!value || !isAllowed(value)) return;
+                    setResult(undefined);
+                    setDate(toIso(value));
+                  }}
+                  onSelectDate={value => {
+                    if (!value || !isAllowed(value)) return;
+                    setResult(undefined);
+                    setDate(toIso(value));
+                  }}
+                />
+              </Field>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="primary" onClick={() => setStep("prompt")}>날짜 확정</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
+
+      <Dialog open={step === "prompt"} onOpenChange={(_, data) => { if (!data.open) setStep("none"); }}>
+        <DialogSurface aria-label="프롬프트 확인">
+          <DialogBody>
+            <DialogTitle>프롬프트 확인</DialogTitle>
+            <DialogContent>
+              <Field label="프롬프트" hint="기본 프롬프트를 그대로 쓰거나 직접 수정할 수 있습니다.">
+                <Textarea
+                  aria-label="프롬프트"
+                  value={prompt}
+                  disabled={running}
+                  resize="vertical"
+                  onChange={(_, data) => {
+                    setPromptEdited(true);
+                    setPrompt(data.value);
+                  }}
+                />
+              </Field>
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setStep("date")}>이전</Button>
+              <Button appearance="primary" onClick={() => setStep("none")}>프롬프트 확정</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
       {running && (
         <Card className={styles.panel}>

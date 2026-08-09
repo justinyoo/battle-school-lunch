@@ -89,6 +89,13 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+/** 학교를 두 곳 고른 뒤 열리는 날짜·프롬프트 모달을 차례로 닫는다. */
+const closeSteps = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(await screen.findByRole("button", { name: "날짜 확정", hidden: true }));
+  await user.click(await screen.findByRole("button", { name: "프롬프트 확정", hidden: true }));
+  await waitFor(() => expect(screen.queryByLabelText("프롬프트")).not.toBeInTheDocument());
+};
+
 describe("급식 배틀 분석 페이지", () => {
   it("이번 달과 직전 달의 날짜만 선택 후보로 제공한다", () => {
     const dates = analysisDates(new Date(2026, 2, 15));
@@ -98,10 +105,22 @@ describe("급식 배틀 분석 페이지", () => {
     expect(dates).not.toContain("2026-04-01");
   });
 
-  it("분석 날짜를 DatePicker 입력으로 바꾼다", async () => {
+  it("학교를 고르면 날짜 모달이 열리고 다음에 프롬프트 모달이 열린다", async () => {
+    const user = userEvent.setup();
     render(<Analysis />);
 
-    const picker = screen.getByLabelText("분석 날짜");
+    expect(screen.queryByLabelText("분석 날짜")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("프롬프트")).not.toBeInTheDocument();
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    expect(screen.queryByLabelText("분석 날짜")).not.toBeInTheDocument();
+
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+
+    const picker = await screen.findByLabelText("분석 날짜");
+    expect(screen.queryByLabelText("프롬프트")).not.toBeInTheDocument();
+
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     expect(picker).toHaveValue(today);
@@ -110,6 +129,14 @@ describe("급식 배틀 분석 페이지", () => {
     fireEvent.change(picker, { target: { value: target } });
     fireEvent.blur(picker);
     await waitFor(() => expect(picker).toHaveValue(target));
+
+    await user.click(screen.getByRole("button", { name: "날짜 확정", hidden: true }));
+    expect(await screen.findByLabelText("프롬프트")).toBeInTheDocument();
+    expect(screen.queryByLabelText("분석 날짜")).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: "프롬프트 확정", hidden: true }));
+    await waitFor(() => expect(screen.queryByLabelText("프롬프트")).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "분석 시작" })).toBeEnabled();
   });
 
   it("무작위 학교 10곳을 보여주고 두 곳을 고르면 선택 결과만 남긴다", async () => {
@@ -119,10 +146,11 @@ describe("급식 배틀 분석 페이지", () => {
     const list = await screen.findByRole("region", { name: "분석 대상 학교" });
     expect(within(list).getAllByRole("button")).toHaveLength(10);
     expect(within(list).getByRole("button", { name: "학교0 · 고등학교 · 지역0" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "분석 시작" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "분석 시작" })).not.toBeInTheDocument();
 
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await closeSteps(user);
 
     expect(screen.queryByRole("region", { name: "분석 대상 학교" })).not.toBeInTheDocument();
     const picked = screen.getByRole("region", { name: "선택한 학교" });
@@ -144,6 +172,7 @@ describe("급식 배틀 분석 페이지", () => {
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
 
     await waitFor(() => expect(mockedPrompt).toHaveBeenCalledWith("학교0", "학교1", expect.any(String)));
+    await user.click(await screen.findByRole("button", { name: "날짜 확정" }));
     const textarea = await screen.findByLabelText("프롬프트");
     await waitFor(() => expect(textarea).toHaveValue("기본 프롬프트"));
 
@@ -159,6 +188,7 @@ describe("급식 배틀 분석 페이지", () => {
     const list = await screen.findByRole("region", { name: "분석 대상 학교" });
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await closeSteps(user);
     await user.click(screen.getByRole("button", { name: "분석 시작" }));
 
     const region = await screen.findByRole("region", { name: "분석 결과" });
@@ -178,6 +208,7 @@ describe("급식 배틀 분석 페이지", () => {
     const list = await screen.findByRole("region", { name: "분석 대상 학교" });
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await closeSteps(user);
     await user.click(screen.getByRole("button", { name: "분석 시작" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("분석에 실패했습니다.");
@@ -207,6 +238,7 @@ describe("급식 배틀 분석 페이지", () => {
     const list = await screen.findByRole("region", { name: "분석 대상 학교" });
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    await closeSteps(user);
     await user.click(screen.getByRole("button", { name: "분석 시작" }));
 
     await waitFor(() => expect(screen.getByTestId("workflow-node-nutrition-health-agent")).toHaveAttribute("data-state", "done"));
