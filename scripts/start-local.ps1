@@ -20,7 +20,7 @@ $backend = Start-Process `
 $devui = Start-Process `
     -FilePath "uv" `
     -ArgumentList "run --project `"$backendDir`" --extra dev python -c `"from app.main import run_devui; run_devui()`"" `
-    -WorkingDirectory $backendDir `
+    -WorkingDirectory $root `
     -PassThru
 
 $mcp = Start-Process `

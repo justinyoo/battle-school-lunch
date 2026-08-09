@@ -235,8 +235,9 @@ E2E는 결정적 평가자를 사용해 외부 서비스에 의존하지 않는�
 오리진 루트 기준 절대 경로를 호출하므로 다른 앱의 하위 경로에 마운트할 수
 없다. 따라서 백엔드 API에 마운트하지 않고 `serve()`로 별도 프로세스에서
 실행하며, 기본 주소는 `http://127.0.0.1:8080`이다. 호스트와 포트는
-`DEVUI_HOST`, `DEVUI_PORT`로 조정한다. DevUI는 `dev` extra에 속하므로
-운영 이미지에서는 실행하지 않는다.
+`DEVUI_HOST`, `DEVUI_PORT`로 조정한다. DevUI 프로세스도 루트 `.env`를
+읽어 `AGENT_PROVIDER=copilot` 설정을 적용할 수 있다. DevUI는 `dev` extra에
+속하므로 운영 이미지에서는 실행하지 않는다.
 
 DevUI는 시작 노드에 문자열이나 매핑을 전달하므로 `prepare-meal-facts`는
 `EvaluationRequest` 외에 JSON 문자열, 날짜가 포함된 자연어 문자열, 딕셔너리

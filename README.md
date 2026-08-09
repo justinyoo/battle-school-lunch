@@ -110,8 +110,7 @@ Agent Framework 공식 DevUI는 백엔드 API와 분리된 별도 프로세스�
 `DEVUI_PORT`로 바꿀 수 있습니다.
 
 ```sh
-cd src/backend
-uv run --extra dev python -c 'from app.main import run_devui; run_devui()'
+uv run --project src/backend --extra dev python -c 'from app.main import run_devui; run_devui()'
 ```
 
 아래의 `start-local` 스크립트를 사용하면 MCP 서버와 DevUI도 함께 실행됩니다.
