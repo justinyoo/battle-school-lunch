@@ -21,8 +21,8 @@
   엔드포인트(`/api/schools/random`, `/api/analysis`,
   `/api/analysis/rubric`, `/api/analysis/workflow`,
   `/api/analysis/prompt`)를 추가했습니다.
-- Microsoft Foundry 연동 설정(`AGENT_PROVIDER`,
-  `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL`)을 추가했습니다. 자격
+- GitHub Copilot SDK 연동 설정(`AGENT_PROVIDER`, `COPILOT_MODEL`,
+  `COPILOT_CLI_PATH`)을 추가했습니다. Copilot CLI나 자격
   증명이 없으면 외부 호출 없는 결정적 평가로 동작합니다.
 - 리포지토리 관리 및 커뮤니티 운영을 위한 초기 파일을 추가했습니다.
 

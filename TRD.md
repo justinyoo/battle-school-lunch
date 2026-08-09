@@ -194,10 +194,11 @@ sequential fan-in 구조를 구성한다.
 영역별 점수는 5점 척도이며 `점수 / 5 × 가중치`로 환산한다. 가중치 합은
 항상 100이다. 근거가 없는 항목은 추정하지 않고 확인 불가로 남긴다.
 
-`AGENT_PROVIDER=foundry`이고 `FOUNDRY_PROJECT_ENDPOINT`,
-`FOUNDRY_MODEL`이 있으면 Microsoft Foundry 모델로 채점하고, 그렇지 않으면
-외부 호출 없는 결정적 평가자로 동작한다. 테스트와 E2E는 결정적 평가자를
-사용해 외부 서비스에 의존하지 않는다.
+`AGENT_PROVIDER=copilot`이면 Microsoft Agent Framework의
+`GitHubCopilotAgent`(GitHub Copilot SDK)로 채점하고, 그렇지 않으면
+외부 호출 없는 결정적 평가자로 동작한다. `COPILOT_MODEL`,
+`COPILOT_CLI_PATH`로 모델과 Copilot CLI 경로를 지정할 수 있다. 테스트와
+E2E는 결정적 평가자를 사용해 외부 서비스에 의존하지 않는다.
 
 ### 3.6 AG-UI 이벤트 경계
 

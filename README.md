@@ -99,9 +99,10 @@ docker compose up --build
 | `GET /dev/workflow` | 백엔드 통합 워크플로우 시각화 dev UI |
 
 기본값인 `AGENT_PROVIDER=deterministic`은 외부 모델 없이 규칙 기반으로
-채점합니다. Microsoft Foundry를 사용하려면 `AGENT_PROVIDER=foundry`와
-함께 `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL`을 설정합니다. 자격 증명이
-없으면 결정적 평가로 자동 전환됩니다.
+채점합니다. GitHub Copilot SDK를 사용하려면 `AGENT_PROVIDER=copilot`을
+설정하고, 필요에 따라 `COPILOT_MODEL`, `COPILOT_CLI_PATH`로 모델과 Copilot
+CLI 경로를 지정합니다. Copilot CLI나 자격 증명이 없으면 결정적 평가로 자동
+전환됩니다.
 
 Docker Compose 없이 로컬에서 두 앱을 함께 실행하려면 다음 스크립트를
 사용할 수 있습니다.

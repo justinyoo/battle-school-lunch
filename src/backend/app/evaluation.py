@@ -1,8 +1,8 @@
 """급식 한 끼 평가 로직.
 
-각 평가 영역은 독립된 평가자가 담당한다. Microsoft Foundry 설정이 있으면
-Microsoft Agent Framework의 `Agent`가 영역을 채점하고, 설정이 없으면
-동일한 인터페이스의 결정적 평가자가 같은 근거 규칙으로 채점한다.
+각 평가 영역은 독립된 평가자가 담당한다. GitHub Copilot SDK 설정이 있으면
+Microsoft Agent Framework의 `GitHubCopilotAgent`가 영역을 채점하고, 설정이
+없으면 동일한 인터페이스의 결정적 평가자가 같은 근거 규칙으로 채점한다.
 """
 
 from __future__ import annotations
@@ -345,14 +345,14 @@ def parse_area_payload(area: RubricArea, text: str) -> AreaResult:
         strings("unknowns"),
         strings("warnings"),
         rationale=str(payload.get("rationale", "")).strip(),
-        mode="foundry",
+        mode="copilot",
     )
 
 
 class ModelAreaEvaluator:
-    """Microsoft Agent Framework `Agent`로 한 영역을 채점한다."""
+    """Microsoft Agent Framework 에이전트로 한 영역을 채점한다."""
 
-    mode = "foundry"
+    mode = "copilot"
 
     def __init__(self, agent_factory: Any) -> None:
         self._agent_factory = agent_factory

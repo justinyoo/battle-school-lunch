@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     neis_base_url: str = "https://open.neis.go.kr/hub"
     cors_origins: str = "http://localhost:5173"
     agent_provider: str = "deterministic"
-    foundry_project_endpoint: str = ""
-    foundry_model: str = ""
+    copilot_model: str = ""
+    copilot_cli_path: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     @property
@@ -281,7 +281,7 @@ async def meals(
 
 
 def _evaluator():
-    return create_evaluator(settings.agent_provider, settings.foundry_project_endpoint, settings.foundry_model)
+    return create_evaluator(settings.agent_provider, settings.copilot_model, settings.copilot_cli_path)
 
 
 async def _load_meals(education_office_code: str, school_code: str, target_date: str) -> dict[str, Any]:
