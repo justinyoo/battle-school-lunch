@@ -75,8 +75,12 @@ const isWorkflowGraph = (value: unknown): value is WorkflowGraph =>
   value.edges.every(item => isRecord(item) && typeof item.from === "string" && typeof item.to === "string" && typeof item.kind === "string");
 export const fetchWorkflowGraph = () => read("/api/analysis/workflow", isWorkflowGraph);
 const promptResponse = (value: unknown): value is { prompt: string } => isRecord(value) && typeof value.prompt === "string";
-export const fetchAnalysisPrompt = (first: string, second: string, date: string) =>
-  read(`/api/analysis/prompt?first=${encodeURIComponent(first)}&second=${encodeURIComponent(second)}&date=${date.replaceAll("-", "")}`, promptResponse);
+export const fetchAnalysisPrompt = (first: string, second: string, date: string, firstLocation = "", secondLocation = "") =>
+  read(
+    `/api/analysis/prompt?first=${encodeURIComponent(first)}&second=${encodeURIComponent(second)}&date=${date.replaceAll("-", "")}` +
+      `&firstLocation=${encodeURIComponent(firstLocation)}&secondLocation=${encodeURIComponent(secondLocation)}`,
+    promptResponse,
+  );
 
 export type AnalysisProgress = { agentName: string; schoolName: string; score: number; weightedScore: number; title: string };
 export type AnalysisStep = { kind: "step-started" | "step-finished"; schoolName: string } | { kind: "school-finished"; schoolName: string } | { kind: "battle-finished" };

@@ -76,6 +76,7 @@ export function Analysis() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const runId = useRef(0);
+  const promptId = useRef(0);
 
   const loadPool = async () => {
     setLoadingPool(true);
@@ -111,17 +112,14 @@ export function Analysis() {
 
   useEffect(() => {
     if (selected.length !== 2 || promptEdited) return;
-    let active = true;
-    void fetchAnalysisPrompt(selected[0].name, selected[1].name, date)
+    const requestId = ++promptId.current;
+    void fetchAnalysisPrompt(selected[0].name, selected[1].name, date, selected[0].location ?? "", selected[1].location ?? "")
       .then(response => {
-        if (active) setPrompt(response.prompt);
+        if (requestId === promptId.current) setPrompt(response.prompt);
       })
       .catch(() => {
-        if (active) setPrompt("");
+        if (requestId === promptId.current) setPrompt("");
       });
-    return () => {
-      active = false;
-    };
   }, [selected, date, promptEdited]);
 
   const applyDate = (value: Date) => {
@@ -286,6 +284,7 @@ export function Analysis() {
                     value={prompt}
                     disabled={running}
                     resize="vertical"
+                    textarea={{ rows: 10 }}
                     onChange={(_, data) => {
                       setPromptEdited(true);
                       setPrompt(data.value);

@@ -171,7 +171,7 @@ describe("급식 배틀 분석 페이지", () => {
     await user.click(within(list).getByRole("button", { name: /학교0/ }));
     await user.click(within(list).getByRole("button", { name: /학교1/ }));
 
-    await waitFor(() => expect(mockedPrompt).toHaveBeenCalledWith("학교0", "학교1", expect.any(String)));
+    await waitFor(() => expect(mockedPrompt).toHaveBeenCalledWith("학교0", "학교1", expect.any(String), "지역0", "지역1"));
     const picker = await screen.findByLabelText("분석 날짜");
     const target = analysisDates().at(-1) as string;
     fireEvent.change(picker, { target: { value: target } });

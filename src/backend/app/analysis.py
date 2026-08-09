@@ -56,10 +56,19 @@ def decide_battle(first: dict[str, Any], second: dict[str, Any]) -> dict[str, An
     }
 
 
-def build_prompt(first_name: str, second_name: str, date: str) -> str:
+def build_prompt(
+    first_name: str,
+    second_name: str,
+    date: str,
+    first_location: str = "",
+    second_location: str = "",
+) -> str:
     areas = ", ".join(f"{area.title} {area.weight}점" for area in RUBRIC_AREAS)
+    first = f"{first_name}({first_location})" if first_location else first_name
+    second = f"{second_name}({second_location})" if second_location else second_name
+    iso_date = f"{date[0:4]}-{date[4:6]}-{date[6:8]}" if len(date) == 8 and date.isdigit() else date
     return (
-        f"{date}의 {first_name}와 {second_name} 중식을 비교 분석해 주세요.\n"
+        f"{first}와 {second}의 {iso_date} 기준 중식을 비교 분석해 주세요.\n"
         f"평가 영역은 {areas}이며, 각 영역을 5점 척도로 채점한 뒤 가중치를 반영해 100점으로 환산합니다.\n"
         "총점 기준으로 승자와 패자를 가리고, 총평과 영역별 평가 근거를 함께 제시해 주세요.\n"
         "제공된 급식 정보에 없는 사실은 추정하지 말고 확인 불가로 남겨 주세요."

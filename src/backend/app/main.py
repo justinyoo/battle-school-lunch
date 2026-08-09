@@ -433,9 +433,19 @@ async def analysis_prompt(
     first: str = Query(min_length=1, max_length=50),
     second: str = Query(min_length=1, max_length=50),
     target_date: str = Query(alias="date", pattern=r"^\d{8}$"),
+    first_location: str = Query("", alias="firstLocation", max_length=50),
+    second_location: str = Query("", alias="secondLocation", max_length=50),
 ) -> dict[str, str]:
     _validate_analysis_date(target_date)
-    return {"prompt": analysis.build_prompt(first.strip(), second.strip(), target_date)}
+    return {
+        "prompt": analysis.build_prompt(
+            first.strip(),
+            second.strip(),
+            target_date,
+            first_location.strip(),
+            second_location.strip(),
+        )
+    }
 
 
 @app.post("/api/analysis")

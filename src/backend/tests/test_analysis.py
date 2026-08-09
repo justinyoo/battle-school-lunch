@@ -151,8 +151,8 @@ def test_agui_stream_emits_protocol_events_in_order() -> None:
 
 
 def test_analysis_prompt_includes_both_schools() -> None:
-    prompt = analysis.build_prompt("A고", "B중", "20260807")
-    assert "A고" in prompt and "B중" in prompt and "20260807" in prompt
+    prompt = analysis.build_prompt("A고", "B중", "20260807", "서울특별시", "경기도")
+    assert prompt.startswith("A고(서울특별시)와 B중(경기도)의 2026-08-07 기준 중식을 비교 분석해 주세요.")
 
 
 def test_rubric_endpoint_exposes_weights() -> None:
