@@ -7,7 +7,7 @@ name = "school-lunch-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "ag-ui-protocol>=0.1.19",
+    "ag-ui-protocol>=0.1.20",
     "agent-framework-core>=1.13",
     "agent-framework-github-copilot>=1.0.1",
     "fastapi>=0.115,<0.138.1",
