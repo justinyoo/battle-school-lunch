@@ -76,25 +76,32 @@ export function Analysis() {
   const [error, setError] = useState("");
   const runId = useRef(0);
   const promptId = useRef(0);
+  const poolId = useRef(0);
 
   const loadPool = async () => {
+    const requestId = ++poolId.current;
     setLoadingPool(true);
     setError("");
     try {
       const response = await fetchRandomSchools();
+      if (requestId !== poolId.current) return;
       setPool(response.items);
       setSelected([]);
       setResult(undefined);
     } catch (e) {
+      if (requestId !== poolId.current) return;
       setPool([]);
       setError(e instanceof Error ? e.message : "학교 목록을 불러오지 못했습니다.");
     } finally {
-      setLoadingPool(false);
+      if (requestId === poolId.current) setLoadingPool(false);
     }
   };
 
   useEffect(() => {
     void loadPool();
+    return () => {
+      poolId.current += 1;
+    };
   }, []);
 
   useEffect(() => {
