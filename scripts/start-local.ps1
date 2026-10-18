@@ -4,7 +4,7 @@ $root = Split-Path -Parent $PSScriptRoot
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     throw "uv가 필요합니다. https://docs.astral.sh/uv/getting-started/installation/ 를 참고하세요."
 }
-if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     throw "Node.js와 npm이 필요합니다."
 }
 
@@ -60,7 +60,7 @@ try {
     Write-Host "DevUI: http://localhost:8080"
     Write-Host "Frontend: http://localhost:5173"
     Write-Host "Press Ctrl+C to stop all apps."
-    & npm.cmd --prefix (Join-Path $root "src\frontend") run dev -- --host 127.0.0.1
+    & npm --prefix (Join-Path $root "src\frontend") run dev -- --host 127.0.0.1
 }
 finally {
     foreach ($process in @($backend, $devui, $mcp)) {
