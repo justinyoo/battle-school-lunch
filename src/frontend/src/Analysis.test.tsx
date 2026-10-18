@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode } from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Analysis, analysisDates } from "./Analysis";
@@ -136,6 +137,28 @@ describe("급식 배틀 분석 페이지", () => {
     expect(await screen.findByLabelText("프롬프트")).toBeInTheDocument();
     expect(screen.queryByLabelText("분석 날짜")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "분석 시작" })).toBeEnabled();
+  });
+
+  it("StrictMode에서 늦게 도착한 이전 학교 목록 응답이 선택을 초기화하지 않는다", async () => {
+    const user = userEvent.setup();
+    const responses: Array<(value: { items: typeof pool }) => void> = [];
+    mockedRandom.mockImplementation(() => new Promise(resolve => responses.push(resolve)));
+    render(<StrictMode><Analysis /></StrictMode>);
+
+    await waitFor(() => expect(responses).toHaveLength(2));
+    await act(async () => responses[1]({ items: pool }));
+
+    const list = await screen.findByRole("region", { name: "분석 대상 학교" });
+    await user.click(within(list).getByRole("button", { name: /학교0/ }));
+    await user.click(within(list).getByRole("button", { name: /학교1/ }));
+    expect(await screen.findByLabelText("분석 날짜")).toBeInTheDocument();
+
+    const stale = pool.map(school => ({ ...school, name: `이전${school.name}` }));
+    await act(async () => responses[0]({ items: stale }));
+
+    expect(screen.getByLabelText("분석 날짜")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /학교 선택 · 학교0 vs 학교1/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /이전학교0/ })).not.toBeInTheDocument();
   });
 
   it("무작위 학교 10곳을 보여주고 두 곳을 고르면 선택 결과만 남긴다", async () => {
