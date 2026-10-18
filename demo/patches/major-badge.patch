@@ -1,0 +1,26 @@
+diff --git a/.github/extensions/dependabot-board/renderer.mjs b/.github/extensions/dependabot-board/renderer.mjs
+index db31377..4b9f036 100644
+--- a/.github/extensions/dependabot-board/renderer.mjs
++++ b/.github/extensions/dependabot-board/renderer.mjs
+@@ -78,6 +78,11 @@ h1 {
+ .chip { font-size: 12px; padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, currentColor 10%, transparent); }
+ .package { font-weight: var(--font-weight-semibold, 600); font-size: 15px; overflow-wrap: anywhere; }
+ .version { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
++.badge-major {
++  margin-left: 4px; padding: 0 6px; border-radius: 4px; font-size: 11px;
++  font-weight: var(--font-weight-semibold, 600); letter-spacing: 0.04em;
++  color: var(--color-white, #fff); background: var(--true-color-red, #cf222e);
++}
+ .ci { display: flex; align-items: baseline; gap: 6px; }
+ .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; transform: translateY(-1px); background: currentColor; }
+ .ci-failing .dot { background: var(--true-color-red, #cf222e); }
+@@ -265,7 +270,8 @@ function renderVersion(card) {
+   return h("div", { class: "version", title: (card.fromSpec || "") + " → " + (card.toSpec || "") },
+     h("span", { class: "mono" }, card.from),
+     "→",
+-    h("span", { class: "mono" }, card.to));
++    h("span", { class: "mono" }, card.to),
++    card.bump === "major" ? h("span", { class: "badge-major" }, "MAJOR") : null);
+ }
+ 
+ function renderCi(ci, number) {
