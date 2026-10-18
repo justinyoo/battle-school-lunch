@@ -27,8 +27,11 @@
   `/api/analysis/rubric`, `/api/analysis/workflow`,
   `/api/analysis/prompt`)를 추가했습니다.
 - GitHub Copilot SDK 연동 설정(`AGENT_PROVIDER`, `COPILOT_MODEL`,
-  `COPILOT_CLI_PATH`)을 추가했습니다. Copilot CLI나 자격
-  증명이 없으면 외부 호출 없는 결정적 평가로 동작합니다.
+  `COPILOT_CLI_PATH`)을 추가했습니다. Copilot 연동 패키지를 불러올 수
+  없으면 외부 호출 없는 결정적 평가로 동작합니다.
+- Docker Compose 컨테이너에서 Copilot SDK 평가를 인증할 수 있도록
+  `.env.example`에 `COPILOT_GITHUB_TOKEN`을 추가하고 설정 방법을
+  문서화했습니다.
 - 리포지토리 관리 및 커뮤니티 운영을 위한 초기 파일을 추가했습니다.
 - DevUI 워크플로우 입력이 JSON뿐 아니라 `YYYY-MM-DD`, `YYYY/MM/DD`,
   `YYYY.MM.DD`, `YYYYMMDD` 날짜가 포함된 자연어도 실행하도록 확장했습니다.

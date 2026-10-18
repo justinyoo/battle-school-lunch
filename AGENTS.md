@@ -69,6 +69,8 @@ FastAPI/Python 3.12 백엔드가 분리되어 있으며, NEIS 호출은 브라�
   `CORS_ORIGINS`, `MCP_HOST`, `MCP_PORT`, `MCP_TRANSPORT`,
   `MCP_SERVER_URL`, `AGENT_PROVIDER`, `COPILOT_MODEL`,
   `COPILOT_CLI_PATH`, `DEVUI_HOST`, `DEVUI_PORT`입니다.
+- `COPILOT_GITHUB_TOKEN`은 백엔드 설정 모델이 아니라 Copilot CLI가 환경
+  변수에서 직접 읽으며, Docker Compose에서 Copilot 평가를 사용할 때 필요합니다.
 - `.env.example`을 참고해 로컬 `.env`를 만들고, 비밀 값·자격 증명·로컬
   환경 파일은 커밋하지 않습니다.
 - NEIS 인증키는 백엔드와 MCP 서버에만 전달하며 코드, 프론트엔드 번들, 로그,

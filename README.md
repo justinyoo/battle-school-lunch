@@ -128,8 +128,19 @@ DevUI에서는 워크플로우를 직접 실행할 수 있습니다. 메뉴 근�
 기본값인 `AGENT_PROVIDER=deterministic`은 외부 모델 없이 규칙 기반으로
 채점합니다. GitHub Copilot SDK를 사용하려면 `AGENT_PROVIDER=copilot`을
 설정하고, 필요에 따라 `COPILOT_MODEL`, `COPILOT_CLI_PATH`로 모델과 Copilot
-CLI 경로를 지정합니다. Copilot CLI나 자격 증명이 없으면 결정적 평가로 자동
-전환됩니다.
+CLI 경로를 지정합니다.
+
+`start-local` 스크립트는 호스트에 로그인된 Copilot CLI 인증을 사용합니다.
+Docker Compose 컨테이너는 호스트의 로그인 정보를 사용할 수 없으므로 `.env`의
+`COPILOT_GITHUB_TOKEN`에 Copilot Requests 권한이 있는 fine-grained PAT 또는
+`gh auth token`으로 발급한 OAuth 토큰을 설정합니다. classic PAT(`ghp_`)는
+지원되지 않으며, 토큰은 커밋하지 않습니다. `.env`를 수정한 뒤에는
+`docker compose up -d --force-recreate backend`로 백엔드 컨테이너를 다시
+만듭니다.
+
+Copilot 연동 패키지를 불러올 수 없으면 결정적 평가로 전환하지만, Copilot
+인증에 실패하면 분석 요청은 오류로 응답합니다. 분석 결과의 영역별 `mode`가
+`copilot`이면 Copilot 에이전트가 채점한 것입니다.
 
 분석 화면의 급식 조회는 MCP 서버를 경유합니다. 백엔드는 `MCP_SERVER_URL`
 (기본값 `http://localhost:8001/mcp`)로 MCP 서버를 호출하며, MCP 서버에
