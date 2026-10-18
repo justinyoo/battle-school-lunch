@@ -213,6 +213,13 @@ sequential fan-in 구조를 구성한다.
 `COPILOT_CLI_PATH`로 모델과 Copilot CLI 경로를 지정할 수 있다. 테스트와
 E2E는 결정적 평가자를 사용해 외부 서비스에 의존하지 않는다.
 
+Copilot 인증 정보는 백엔드 설정 모델이 아니라 Copilot CLI가 프로세스
+환경 변수에서 직접 읽는다. 로컬 실행은 호스트에 로그인된 Copilot CLI
+인증을 사용하고, Docker Compose 컨테이너는 `env_file`로 전달된
+`COPILOT_GITHUB_TOKEN`을 사용한다. 연동 패키지를 불러올 수 없을 때만
+결정적 평가자로 전환하며, 실행 중 Copilot 인증이 실패하면 분석 요청은
+오류로 끝난다.
+
 ### 3.6 AG-UI 이벤트 경계
 
 `/api/analysis/agui`는 `text/event-stream`으로 `RUN_STARTED`,

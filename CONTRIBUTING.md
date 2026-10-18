@@ -64,6 +64,8 @@ bash ./scripts/start-local.sh
 DevUI는 `http://localhost:8080`, MCP 서버는
 `http://localhost:8001/mcp`에서 제공됩니다. Copilot SDK 평가를 사용하려면
 루트 `.env`에 `AGENT_PROVIDER=copilot`과 필요한 Copilot 설정을 지정합니다.
+로컬 스크립트는 호스트에 로그인된 Copilot CLI 인증을 사용하며, Docker
+Compose로 실행할 때는 `COPILOT_GITHUB_TOKEN`도 지정해야 합니다.
 
 프론트엔드, 백엔드 및 MCP 테스트를 한 번에 실행:
 
