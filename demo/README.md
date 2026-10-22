@@ -6,7 +6,7 @@
 
 | 파일 | 용도 |
 |---|---|
-| `meetup-deck.md` | 슬라이드 원본(20장). 슬라이드별 진행 메모는 발표자 노트에 있음 |
+| `meetup-deck.md` | 슬라이드 원본(21장). 슬라이드별 진행 메모와 마지막 CTA의 시작 링크 포함 |
 | `meetup-deck.html` | 발표용 내보내기. `backgrounds/`와 같은 위치에 두고 열기 |
 | `backgrounds/` | 슬라이드 배경 이미지(칠판, 모눈종이, Canvas·Automation 대비) |
 | `assets/icon-linkedin.png` | 표지에 표시하는 LinkedIn 아이콘 |
