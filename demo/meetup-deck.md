@@ -499,6 +499,12 @@ commit/co | 2026-10-22
 
 유저스틴 | 수석 디벨로퍼 아드보캇 | GitHub | <img class="linkedin-icon" src="assets/icon-linkedin.png" alt="LinkedIn"> [@justinyoo](https://linkedin.com/in/justinyoo)
 
+<!--
+- 인사
+- 세션 소개 및 기대치 설정 & 질문은 나중에
+- 자기 소개
+-->
+
 ---
 
 <!-- _class: ask -->
@@ -506,6 +512,10 @@ commit/co | 2026-10-22
 ![bg](backgrounds/bg-c-grid-note.png)
 
 # AI에게 일을 시킬 때, 뭐가 불편했나요?
+
+<!--
+- 질문 던지기
+-->
 
 ---
 
@@ -515,6 +525,18 @@ commit/co | 2026-10-22
 
 - 결과물이 채팅 밖에 있다 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> 화면을 계속 오간다
 - 같은 일을 매번 시킨다 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> 내가 계속 붙어 있어야 한다
+
+<!--
+- 항상 결과물을 확인하기 위해 웹 브라우저를 따로 열어야 한다거나, 터미널을 따로 연다거나 등등
+- 흔히 얘기하는 outer loop를 타는 것
+- 보통 자주 반복하는 일들이 있음. 그걸 위해 내가 계속 AI 앞에 붙어있어야 함
+- 만약 이런 것들을 앱 안에서 모두 해결할 수 있다면?
+- 그걸 보통 inner loop라고 얘기함
+- 그리고 이런 inner loop를 마소/깃헙이 참 잘 해줌
+- 오늘은 코파일럿 앱에서 이런 걸 어떻게 하는지 약을 좀 팔겠음
+- 혹시 캔버스 써 본 사람?
+- 혹시 오토메이션 써 본 사람?
+-->
 
 ---
 
@@ -528,6 +550,10 @@ commit/co | 2026-10-22
 - **예** 웹 페이지, 표, 슬라이드, PR
 - **언제** 눈으로 확인하며 여러 번 고쳐야 할 때
 
+<!--
+- outer loop 타는 대신 inner loop에서 해결하기 좋은 것이 코파일럿 앱의 캔버스 기능임
+-->
+
 ---
 
 ![bg](backgrounds/bg-c-grid-note.png)
@@ -539,6 +565,10 @@ commit/co | 2026-10-22
 - 프롬프트와 일정을 저장해 두면 정해진 때 알아서 실행
 - **예** 매일 아침 브리핑, 매주 문서 점검
 - **언제** 반복되고, 결과는 나중에 봐도 될 때
+
+<!--
+- 그리고 자잘한 반복적인 일들을 주로 에이전트에게 맡길 때 쓰는 기능이 오토메이션임
+-->
 
 ---
 
@@ -552,6 +582,10 @@ commit/co | 2026-10-22
 > **Automation**
 > 내가 자리에 없을 때
 
+<!--
+- 그래서 코파일럿 앱을 쓸 때 이 두가지 기능을 잘 활용하면 생산성이 참 좋아짐
+-->
+
 ---
 
 ![bg](backgrounds/bg-c-grid-note.png)
@@ -562,6 +596,11 @@ commit/co | 2026-10-22
 - 교육청 공개 급식 데이터 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> AI 에이전트 분석 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> 점수
 - 오늘은 이 앱을 **한동안 돌보지 못한 상태**에서 다시 열어 봅니다
 
+<!--
+- 지난 8월에 파이콘에서 바이브코딩 워크샵을 진행하면서 만들었던 앱임
+- 그 이후로 손 놓고 있었더니 이런저런 업데이트 할 것들이 생겼음
+-->
+
 ---
 
 <!-- _class: demo -->
@@ -571,6 +610,10 @@ commit/co | 2026-10-22
 # 급식배틀 앱 둘러보기
 
 Browser Canvas
+
+<!--
+- 쟈... 한 번 둘러볼까요?
+-->
 
 ---
 
@@ -587,6 +630,10 @@ Browser Canvas
 
 영역별 5점 척도 <i class="fa-solid fa-arrow-right" aria-hidden="true"></i> 가중치로 환산해 100점 만점
 
+<!--
+- 이 부분을 잘 보고 있을 것! 두 학교의 급식 데이터를 비교해서 AI 에이전트가 분석하고 결과를 보여줌
+-->
+
 ---
 
 <!-- _class: demo -->
@@ -597,6 +644,10 @@ Browser Canvas
 
 Excel Canvas <span class="sep"></span> 여러분이 고른 학교 두 곳으로
 
+<!--
+- 엑셀 파일로 결과를 옮겨서 어떻게 되는지 한 번 보쟈
+-->
+
 ---
 
 <!-- _class: numbers -->
@@ -605,13 +656,29 @@ Excel Canvas <span class="sep"></span> 여러분이 고른 학교 두 곳으로
 
 ## 두 달 만에 다시 열어 보니
 
-- **20** 쌓인 의존성 업데이트 PR
-- **4** 서로 다른 실패 원인
-- **0** 8월 이후 main CI 실행 횟수
+- **20** 열린 의존성 업데이트 PR
+- **10** CI 실패 PR
+- **3** 9월 이후 main CI 실행
 
-발표 준비 시점 기준
+실패 PR 10개를 로그 기준으로 묶으면 **오류 유형 5가지**
 
-<!-- 발표 직전에 숫자를 다시 확인 (Dependabot 상태 고정 여부에 따라 바뀜) -->
+API 호환성 · 의존성 충돌 · 모듈 로딩 · 입력 요소 탐색 · E2E 시간 초과
+
+2026-10-22 확인 기준
+
+<!--
+- 발표 직전에 숫자를 다시 확인 (Dependabot 상태에 따라 바뀜).
+- 열린 Dependabot PR 20개 중 최신 체크 실패 10개, 통과 10개.
+- 10개는 CI 실행 실패 횟수가 아니라 최신 체크가 실패한 PR 수.
+
+- 오류 유형 5가지는 관찰된 로그 증상 기준이며, 독립적인 근본 원인 5개를 뜻하지 않음.
+- API 호환성: #81, #72 / 의존성 충돌: #85 / 모듈 로딩: #67, #65.
+- 입력 요소 탐색: #80 / E2E 시간 초과: #84, #82, #58, #55.
+- 입력 요소 탐색과 E2E 시간 초과가 같은 근본 원인인지는 확인되지 않음.
+
+- main의 CI 워크플로우는 2026-09-01 이후 3회 실행됨.
+- 첫 실행은 E2E 실패, 이후 두 실행은 검사 5종 통과 후 Azure 배포 인증 실패.
+-->
 
 ---
 
@@ -624,6 +691,11 @@ Excel Canvas <span class="sep"></span> 여러분이 고른 학교 두 곳으로
 - 하나씩 열어 보면 반나절
 - 그냥 다 머지하면 위험
 - 오늘은 **맡기고, 같이 보고, 판단은 내가**
+
+<!--
+- 이 중에서 뭐부터 봐야 할까?
+- 그냥 다 머지해줘! 해도 되긴 하지만, 그 후폭풍은 어떻게 될지 모름
+-->
 
 ---
 
@@ -638,6 +710,8 @@ Automation <span class="sep"></span> 매일 오전 9시 <span class="sep"></span
 [Automation 만들기 <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>](https://github.com/copilot/app/launch?open=ghapp%3A%2F%2Fautomations%2Fnew%3Fname%3DDependabot%2520%25EC%2595%2584%25EC%25B9%25A8%2520%25EB%25B8%258C%25EB%25A6%25AC%25ED%2595%2591%26trigger%3Ddaily%26time%3D09%253A00%26prompt%3D%252Fdependabot-briefing%2520%25EC%2597%25B4%25EB%25A6%25B0%2520Dependabot%2520PR%25EC%259D%2584%2520%25ED%259B%2591%25EC%2596%25B4%25EB%25B3%25B4%25EA%25B3%25A0%2520%25EC%2598%25A4%25EB%258A%2598%2520%25EB%25B3%25BC%25203%25EA%25B0%2580%25EC%25A7%2580%25EB%25A5%25BC%2520%25EA%25B3%25A8%25EB%259D%25BC%2520%25EC%25A4%2598)
 
 <!--
+- 이런 디펜다봇 PR은 수시로 발생함. 그래서 이걸 자동화해서 매일 아침 9시에 보고해 달라고 할 거임
+
 ① 링크를 눌러 채워진 생성 화면을 보여 주고 저장하지 않고 닫기 (30초)
 ② 미리 만들어 둔 Automation의 지난 실행 결과
 ③ ▶로 지금 실행
@@ -652,9 +726,12 @@ Automation <span class="sep"></span> 매일 오전 9시 <span class="sep"></span
 
 # 20개 PR, 한 화면에서 결정
 
-Dependabot 관제탑 <span class="sep"></span> #81을 골라 "Copilot에게 맡기기"
+Dependabot 관제탑 <span class="sep"></span> PR 하나를 골라 "Copilot에게 맡기기"
 
-<!-- 정체는 17번에서 공개하므로 "직접 만든", "커스텀"이라는 말을 쓰지 않음 -->
+<!--
+- 정체는 17번에서 공개하므로 "직접 만든", "커스텀"이라는 말을 쓰지 않음
+- PR 번호는 상황에 따라 다르겠지만, 81번을 선택할 수 있으면 할 것
+-->
 
 ---
 
@@ -662,11 +739,14 @@ Dependabot 관제탑 <span class="sep"></span> #81을 골라 "Copilot에게 맡�
 
 ![bg](backgrounds/bg-b-chalkboard.png)
 
-# #81은 왜 깨졌을까?
+# 이 PR은 왜 깨졌을까?
 
 PR Canvas <span class="sep"></span> diff와 CI 로그로 근거 확인
 
-<!-- PR Canvas의 CI 링크는 외부 브라우저로 열림. 로그는 관제탑 #81 카드의 Python 실패 링크를 클릭하거나 "#81 CI 로그 앱 안에서 열어 줘"로 앱 안 Browser Canvas에서 엶 -->
+<!--
+- PR Canvas의 CI 링크는 외부 브라우저로 열림
+- 로그는 관제탑 #81 카드의 Python 실패 링크를 클릭하거나 "#81 CI 로그 앱 안에서 열어 줘"로 앱 안 Browser Canvas에서 엶
+-->
 
 ---
 
@@ -697,7 +777,11 @@ Automation <span class="sep"></span> 사람이 고르고, Automation이 고치�
 
 직접 만든 Canvas <span class="sep"></span> "major 업데이트에 빨간 배지 달아 줘"
 
-<!-- 저장소에 넣어 둔 확장 하나로 동작해 클론한 팀원 모두 사용. 라이브로 고치고 reload해서 바로 반영. 막히면 git apply demo/patches/major-badge.patch 후 확장 reload -->
+<!--
+- 저장소에 넣어 둔 확장 하나로 동작해 클론한 팀원 모두 사용.
+- 라이브로 고치고 reload해서 바로 반영.
+- 막히면 git apply demo/patches/major-badge.patch 후 확장 reload
+-->
 
 ---
 
@@ -714,6 +798,11 @@ Automation <span class="sep"></span> 사람이 고르고, Automation이 고치�
 
 판단과 머지는 **사람이**
 
+<!--
+- 쟈... 오늘 캔버스와 오토메이션 알아봤음
+- 어떤 경우에 어떤 것 쓰는 거 알겠지?
+-->
+
 ---
 
 <!-- _class: rules -->
@@ -727,6 +816,26 @@ Automation <span class="sep"></span> 사람이 고르고, Automation이 고치�
 3. 결과에는 근거 링크를 반드시 붙이기
 4. 비밀 값과 환경 변수는 화면과 결과에서 빼기
 
+<!--
+- 맡길 때 조심해야 할 부분!
+-->
+
+---
+
+<!-- _class: rules -->
+
+![bg](backgrounds/bg-c-grid-note.png)
+
+## 지금, 하나씩 시작해 보세요
+
+- **Copilot 앱**: [gh.io/app](https://gh.io/app)
+- **Copilot 앱 캔버스**: [gh.io/app/canvases](https://gh.io/app/canvases)
+- **Copilot 앱 오토메이션**: [gh.io/app/automations](https://gh.io/app/automations)
+
+<!--
+- 앱을 열고, 같이 볼 화면은 Canvas로, 반복할 일은 Automation으로 시작해 보세요.
+-->
+
 ---
 
 <!-- _class: finale -->
@@ -739,3 +848,7 @@ Automation <span class="sep"></span> 사람이 고르고, Automation이 고치�
 매일 하는 일 중 하나를 Automation으로
 
 감사합니다 <span class="sep"></span> Q&A
+
+<!--
+- 쟈... 그럼 여러분은 어떤 걸 캔버스로 만들고 어떤걸 오토메이션으로 만들거얌?
+-->
